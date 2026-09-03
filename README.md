@@ -29,7 +29,7 @@ Do dyspozycji masz wygodne, gotowe skrypty `.bat` (uruchamiane dwuklikiem):
 
 ### 3. Jakie są możliwości konfiguracji (`config.yaml`)?
 Wszystkimi aspektami montażu sterujesz z poziomu przejrzystego pliku konfiguracyjnego `config.yaml`:
-* **Wybór utworu:** automatyczny (pierwszy z brzegu z folderu `sciezkadzwiekowa/`) lub wskazany z nazwy.
+* **Wybór utworu (`music_file`):** precyzyjnie wskazujesz nazwę pliku MP3 z folderu `sciezkadzwiekowa/` (wymagane ścisłe dopasowanie).
 * **Wymuszone ujęcia (`forced_clips`):** zdefiniuj klipy, które **muszą** pojawić się w filmie, opcjonalnie podając dokładny czas (np. tort urodzinowy w `1:45`).
 * **Wagi scoringu sztucznej inteligencji:** zdecyduj, co jest ważniejsze w doborze ujęć - obecność ludzi i twarzy, dynamika ruchu (Optical Flow), czy perfekcyjna ostrość kadru.
 * **Dynamika cięć:** ustaw minimalny czas ujęcia (domyślnie bezpieczne `1.20s`, zapobiegające efektowi stroboskopu) oraz częstotliwość cięć w zależności od energii muzyki (cięcie co 1, 2 lub 3 takty).
@@ -369,11 +369,11 @@ forced_clips:
 | `music_time` | Opcjonalny | Chwila czasowa w gotowym filmie / podkładzie muzycznym, kiedy ujęcie ma się pojawić. Formaty: `"1:30"` (1 min 30s), `"90"` (90 sekund). *(Działa także dawny alias `time`)*. |
 | `clip_time` | Opcjonalny | Punkt startowy wewnątrz Twojego nagrania (np. `"0:03"` lub `"15"`). Pomija wszystko co przed nim! Algorytm sam dobierze odpowiednią długość trwania sceny w rytm muzyki. |
 
-- Ujęcie jest **przycinane** do długości slotu (~1–6s zależnie od energii muzyki) — nie musisz martwić się o wyliczanie końca ujęcia.
-- Ujęcie pojawi się **w pobliżu** żądanego czasu - dokładna pozycja zależy od siatki beatów muzyki
-- Jeśli dwa wymuszone ujęcia mają ten sam slot - drugie zostaje przesunięte do następnego wolnego
+* **Gdy podasz tylko `file` (bez `music_time` i bez `clip_time`):**
+  * Ujęcie trafi na oś czasu **automatycznie i chronologicznie** (zgodnie z datą/godziną nagrania).
+  * Algorytm AI **samodzielnie przeskanuje klip i wybierze z niego najlepszy moment** (najwyższy score: ostrość, twarze, stabilność).
+* **Długość wycinka:** Zawsze dobierana jest automatycznie w rytm muzyki (~1.2–6s zależnie od energii) — nie musisz ręcznie wyliczać klatki końcowej!
+* **Kolizje czasowe:** Jeśli dwa wymuszone ujęcia trafią na ten sam slot, drugie zostanie przesunięte do najbliższego wolnego miejsca na osi czasu.
 
 > [!NOTE]
 > Po zmianie `forced_clips` wystarczy uruchomić `ZROB_PREVIEW.bat` (nie trzeba ponownie analizować klipów - analiza jest w cache).
-
-

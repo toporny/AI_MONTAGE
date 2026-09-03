@@ -17,9 +17,8 @@ paths:
   # Katalog z plikami muzycznymi MP3
   music_dir: "sciezkadzwiekowa"
 
-  # Wybrany plik MP3 do montażu (pełna ścieżka lub nazwa pliku w music_dir)
-  # Jeśli puste (""), program wybierze pierwszy znaleziony plik MP3 z music_dir
-  music_file: ""
+  # Wybrany plik MP3 do montażu (wymagana dokładna nazwa pliku w music_dir lub ścieżka)
+  music_file: "Płomień (Catchy Power Remix)(3).mp3"
 
   # Katalogi robocze (względne do lokalizacji config.yaml)
   cache_dir: "analysis"

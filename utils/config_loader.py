@@ -133,13 +133,9 @@ class Config:
         return (self.base_dir / p).resolve()
 
     def get_music_file_path(self) -> Optional[Path]:
-        """Zwraca bezwzględną ścieżkę do pliku muzycznego."""
+        """Zwraca bezwzględną ścieżkę do pliku muzycznego. Wymaga podania konkretnego pliku w config.yaml."""
         if not self.music_file:
-            # Spróbuj znaleźć pierwszy plik mp3 w music_dir
-            if self.music_dir.exists():
-                mp3_files = list(self.music_dir.glob("*.mp3"))
-                if mp3_files:
-                    return mp3_files[0]
+            logger.error("Nie zdefiniowano 'music_file' w pliku konfiguracyjnym config.yaml! Wymagane jest podanie konkretnego pliku MP3.")
             return None
 
         mf = Path(self.music_file)
@@ -155,11 +151,7 @@ class Config:
         if in_base.exists():
             return in_base
 
-        # Fallback: szukaj w katalogu Downloads użytkownika
-        downloads_candidate = Path.home() / "Downloads" / self.music_file
-        if downloads_candidate.exists():
-            return downloads_candidate
-
+        logger.error(f"Nie znaleziono wskazanego pliku muzycznego '{self.music_file}' w katalogu {self.music_dir}!")
         return None
 
 
