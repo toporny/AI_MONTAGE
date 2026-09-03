@@ -1,0 +1,544 @@
+# AI_MONTAGE — Dokumentacja techniczna dla kolejnego agenta AI
+# Wersja: 2026-09-03 | Projekt: Automatyczny montaż filmowy z muzyki
+
+================================================================================
+SPIS TREŚCI
+================================================================================
+1.  Cel projektu i stan obecny
+2.  Struktura katalogów na dysku
+3.  Architektura i pipeline — kolejność etapów
+4.  Pliki źródłowe — co robi każdy plik
+5.  Konfiguracja (config.yaml) — wszystkie opcje
+6.  Algorytmy kluczowe
+7.  Kluczowe decyzje projektowe (historia zmian)
+8.  Znane ograniczenia i miejsca do poprawy
+9.  Jak szybko zrozumieć aktualny storyboard
+10. Komendy uruchomieniowe
+
+================================================================================
+1. CEL PROJEKTU I STAN OBECNY
+================================================================================
+
+PROJEKT: Lokalny (bez chmury) system Python + FFmpeg + NVENC do automatycznego
+montażu filmowego z dowolnej liczby klipów wideo zsynchronizowanego z muzyką MP3.
+Działa na każdym wydarzeniu: imprezy, urodziny, eventy plenerowe, koncerty itp.
+
+LOKALIZACJA PROJEKTU (bieżące wdrożenie):
+  AI_MONTAGE/ (katalog projektu)
+
+UWAGA: Katalog AI_MONTAGE można skopiować do dowolnej lokalizacji.
+  Ścieżki w config.yaml są zlokalizowane wewnątrz katalogu projektu
+  (materialy_oryginalne, kopie_robocze_480p, sciezkadzwiekowa).
+
+KONTEKST PRZYKŁADOWYCH NAGRAŃ (przykładowe wydarzenie / event):
+  Wydarzenie trwało 2 dni (28-29 sierpnia 2026) + rano 30 sierpnia.
+  Dzień 1 (28.08): rejestracja, wejście, sala, mówcy, wieczór
+  Dzień 2 (29.08): rano, warsztaty, gala wieczorna
+  Dzień 3 (30.08): wręczenie nagród, powrót samochodem
+
+SPRZĘT / WYMAGANIA:
+  - Windows 10/11, Intel Core i7 / AMD Ryzen
+  - 16-32 GB RAM
+  - GPU: Zalecana karta NVIDIA z NVENC (np. GTX 1660, RTX 2060/3060/3090/40xx)
+         Działa również fallback na CPU (libx264/libx265)
+  - Python 3.10-3.12, FFmpeg w PATH (z obsługą NVENC lub programową)
+
+STAN GOTOWYCH ARTEFAKTÓW (wg sesji 2026-09-02):
+  - output/final_montage_4K60.mp4 — 1113 MB, 4 min 34 s, hevc_nvenc, 3840x2160
+  - preview/preview_montage_480p.mp4 — ~10 MB, 480p draft
+  - storyboard/storyboard.json — 100 ujęć, ścisła chronologia
+  - storyboard/storyboard.txt — czytelna wersja dla człowieka
+  - storyboard/music_analysis.json — BPM=136, 9 dropów, 278s muzyki
+
+MUZYKA: c:\...\muzyka\Płomień (Catchy Power Remix)(3).mp3
+  BPM: 136, długość: 278s (4 min 38 s), 9 punktów kulminacyjnych (dropów)
+
+================================================================================
+2. STRUKTURA KATALOGÓW NA DYSKU
+================================================================================
+
+Katalog główny projektu (AI_MONTAGE/):
+  main.py               — CLI entry point (komendy: analyze, analyze-music,
+                          create-storyboard, preview, render, all)
+  config.yaml           — GŁÓWNY plik konfiguracyjny (wszystkie ustawienia)
+  requirements.txt      — zależności pip
+  setup_venv.bat        — instalator środowiska venv (1-kliknięcie)
+  run.bat               — uruchamianie komend przez venv (+ sync-proxies, export-clips)
+  ZROB_PREVIEW.bat      — 4 kroki: sync→analyze→storyboard→preview480p (NO auto-open)
+  ZROB_RENDER_4K.bat    — 4 kroki: sync→analyze→storyboard→render4K (NO auto-open)
+  sync_proxies.py       — synchronizacja ANALIZA_480P↔ORYGINALY
+  export_clips.py       — eksport poszczególnych ujęć do clips_4k/ i clips_480p/
+
+Moduły Python:
+  analyzer/
+    video_analyzer.py   — orkiestrator analizy 209 plików proxy, cache JSON
+    scene_detector.py   — PySceneDetect, wykrywa naturalne cięcia kamerowe
+    quality_analyzer.py — Laplacian variance (ostrość), blur, ekspozycja, stabilność
+    people_detector.py  — YOLOv8 (yolov8n.pt), liczba osób, plany (Close-up/Medium/Wide/Crowd)
+    motion_analyzer.py  — Optical Flow, dynamika ruchu, kierunek
+    highlight_detector.py — NMS, wyznaczanie najlepszych fragmentów czasowych
+
+  music/
+    music_analyzer.py   — orkiestrator analizy MP3, zapis music_analysis.json
+    beat_detector.py    — librosa: BPM, beaty, takty 4/4, frazy muzyczne
+    energy_analyzer.py  — RMS + Spectral Centroid, sekcje energetyczne, dropy
+
+  montage/
+    timeline.py         — buduje sloty czasowe (TimelineBuilder.build_timeline_slots)
+    scoring.py          — oblicza score dopasowania klipu do slotu (MontageScorer)
+    selector.py         — GŁÓWNY ALGORYTM montażysty (MontageSelector.select_montage)
+    storyboard.py       — eksport/import storyboard.json i storyboard.txt
+
+  render/
+    preview.py          — render 480p z proxy (PreviewRenderer.render_preview)
+    final_render.py     — render 4K/60fps z oryginałów NVENC (FinalRenderer.render_final_master)
+
+  utils/
+    config_loader.py    — parser config.yaml → klasa Config
+    helpers.py          — find_matching_original, extract_event_timestamp, get_base_stem, run_command
+    logger.py           — Rich console + plik montage.log
+
+Dane wyjściowe:
+  analysis/             — JSONy cache dla każdego proxy (209+ plików .json)
+  storyboard/           — storyboard.json, storyboard.txt, music_analysis.json
+  preview/              — preview_montage_480p.mp4
+  output/               — final_montage_4K60.mp4
+  clips_4k/             — (opcjonalne) fragmenty 4K ze storyboardu (export_clips.py)
+  clips_480p/           — (opcjonalne) fragmenty 480p ze storyboardu (export_clips.py)
+
+Katalogi z materiałami (wewnątrz AI_MONTAGE):
+  materialy_oryginalne/ — oryginalne pliki 4K/60fps (203 pliki)
+  kopie_robocze_480p/   — proxy 480p/15fps (209 plików, _480p15.mp4 suffix)
+  sciezkadzwiekowa/     — pliki MP3
+Katalogi poza AI_MONTAGE:
+  Obrazek_koncowy/      — obrazek_koncowy.jpg (statyczne outro)
+
+================================================================================
+3. ARCHITEKTURA I PIPELINE — KOLEJNOŚĆ ETAPÓW
+================================================================================
+
+ETAP 1 — sync_proxies.py (OPCJONALNY, ale w batach zawsze 1.)
+  - Porównuje materialy_oryginalne/ z kopie_robocze_480p/
+  - Brakujące proxy: kompresuje przez FFmpeg (libx264, 854x480, 15fps, crf28)
+  - Orphan proxy (bez oryginału): USUWA
+  - Konwencja nazwy proxy: BASENAME.stem.lower() + "_480p15.mp4"
+
+ETAP 2 — python main.py analyze
+  - VideoAnalyzer.analyze_all_videos() skanuje kopie_robocze_480p/
+  - Dla każdego .mp4 sprawdza czy jest JSON w analysis/ (cache)
+  - Jeśli nie ma → analizuje (YOLO, Laplacian, OpticalFlow, SceneDetect)
+  - Zapisuje analysis/<plik>.json z polami:
+      file_name, duration, proxy_path, candidate_highlights[]
+      (każdy highlight: start_sec, end_sec, duration, score, shot_type,
+       max_people, motion_score, scene_idx)
+
+ETAP 3 — python main.py analyze-music (lub automatycznie w create-storyboard)
+  - MusicAnalyzer → beat_detector + energy_analyzer
+  - Wczytuje MP3 librosa, liczy BPM, beat_times[], beat_energies[], drops[]
+  - Zapisuje storyboard/music_analysis.json
+
+ETAP 4 — python main.py create-storyboard
+  Podkroki:
+  a) TimelineBuilder.build_timeline_slots(music_data)
+     - Iteruje beaty, wyznacza sloty o długości zależnej od energii:
+       drop_or_climax: 1.2–2.2s (co 4 beaty)
+       high_energy:    1.5–2.8s (co 4 beaty)
+       medium_energy:  2.2–4.2s (co 8 beatów)
+       calm:           3.5–6.5s (co 12 beatów)
+     - Wynik: ~100 slotów dla 278s muzyki przy BPM=136
+
+  b) MontageSelector.select_montage(slots, analyses) — GŁÓWNY ALGORYTM:
+     1. Sortuje klipy chronologicznie po extract_event_timestamp(file_name)
+        Wzorzec: DD_HHMMSS → dzień*86400 + godz*3600 + min*60 + sek
+     2. Przypisuje file_idx (0..N-1) i event_progress (0.0..1.0)
+     3. Rezerwuje ostatni slot: statyczny obraz outro (config.outro_image_path)
+        lub klip "jedziemy_samochodem" (fallback)
+     4. NOWE: wykrywa pliki CAPS w ORYGINALY/ (wielkie litery w nazwie)
+        → metoda _find_required_caps_clips()
+        → dopasowuje do analiz proxy (case-insensitive stem match)
+        → rezerwuje slot proporcjonalny do file_idx
+        → force-assign: score += 50.0, reason="CAPS_wymagany"
+     5. Monotonic Sliding Window (etap główny, sloty 0..N-2):
+        - target_idx = int(s_idx * (num_vids-1) / (num_slots-1))
+        - Okna: [2, 4, 8, 15, 30, num_vids]
+        - min_idx = max(last_vid_idx, target_idx - w)
+        - max_idx = min(num_vids-1, target_idx + max(2, w//2))
+        - Kara za odchylenie: score -= abs(file_idx - target_idx) * 0.8
+        - last_vid_idx = max(last_vid_idx, chosen.file_idx) → ŚCISŁA CHRONOLOGIA
+
+  c) StoryboardManager.export_storyboard() → storyboard.json + storyboard.txt
+
+ETAP 5 — python main.py preview
+  - PreviewRenderer.render_preview()
+  - Dla każdego cut ze storyboard.json:
+    * source_type == "image" → ffmpeg -loop 1 -i img -t dur -vf scale=854:480...
+    * normalny klip → ffmpeg -ss start -i proxy -t dur -c:v h264_nvenc -cq 34 -p1
+  - Concat list → ffmpeg concat + mix muzyki AAC 128k
+  - Wynik: preview/preview_montage_480p.mp4 (~27s, ~10 MB)
+
+ETAP 6 — python main.py render
+  - FinalRenderer.render_final_master()
+  - find_matching_original(proxy_name, ORYGINALY/) → case-insensitive glob
+  - Dla każdego cut:
+    * source_type == "image" → ffmpeg -loop 1 -vf scale=3840:2160... hevc_nvenc
+    * normalny klip → ffmpeg -ss -i orig -t -c:v hevc_nvenc -cq 19 -preset p6
+  - Concat + muzyka AAC 320k → output/final_montage_4K60.mp4
+  - Czas ~7-10 min na RTX 3090
+
+================================================================================
+4. PLIKI ŹRÓDŁOWE — CO ROBI KAŻDY PLIK (SZCZEGÓŁOWO)
+================================================================================
+
+--- main.py ---
+Entry point CLI. argparse komendy:
+  analyze, analyze-music, create-storyboard, preview, render, all
+Flagi: --config PATH, --music PATH, --force (ignoruj cache analizy)
+Inicjalizuje wszystkie klasy z config i wywołuje po kolei.
+
+--- utils/config_loader.py ---
+Klasa Config (wczytywana z config.yaml):
+  Atrybuty ścieżek: proxy_dir, original_dir, music_dir, music_file, cache_dir,
+    storyboard_dir, preview_dir, output_dir, outro_image_path (Path lub None)
+  Scoring: weight_sharpness, weight_people, weight_motion, weight_composition,
+    blur_penalty, exposure_penalty, camera_shake_penalty
+  Music: onset_sensitivity, beats_per_bar, energy_smoothing_sec, energy_thresholds
+  Montage: min_cut_duration_sec, cut_durations{drop_or_climax,high,medium,calm},
+    snap_to_beat, snap_tolerance_sec, reserve_top_highlights_ratio
+  Chronology: chronology_enabled, chronology_weight, chronology_local_window,
+    chronology_backward_penalty
+  Penalties: consecutive_shot_type_penalty, clip_reuse_penalty, max_source_clip_uses
+  Rendering: preview_settings{cq,preset,audio_bitrate}, final_settings{cq,preset,tune}
+Metoda _resolve_path() obsługuje ścieżki absolutne i względne do base_dir.
+Metoda get_music_file_path() szuka pliku muzycznego w kilku lokalizacjach.
+
+--- utils/helpers.py ---
+Kluczowe funkcje:
+  extract_event_timestamp(filename) → float
+    Parsuje DD_HHMMSS z nazwy pliku → sekundy absolutne
+    Używane do chronologicznego sortowania klipów
+    Fallback: st_mtime lub 0.0
+
+  find_matching_original(proxy_path, originals_dir) → Optional[Path]
+    Case-insensitive lookup: sprawdza stem.lower(), stem.upper(), stem.capitalize()
+    Potem iterdir() case-insensitive glob po wszystkich plikach wideo
+    Wspiera rozszerzenia: .mp4 .mov .mkv .avi .mts .m2ts
+    WAŻNE: obsługuje pliki CAPS w ORYGINALY/
+
+  get_base_stem(filename) → str
+    Usuwa sufiks _480p15, _proxy, _low z nazwy (regex re.IGNORECASE)
+
+  run_command(cmd) → CompletedProcess
+    Wrapper subprocess z logowaniem
+
+--- montage/selector.py ---
+NAJWAŻNIEJSZY PLIK. Dwie klasy/funkcje:
+
+  _has_uppercase(filename) → bool   (helper globalny)
+    re.search(r"[A-Z]", stem)
+
+  MontageSelector._find_required_caps_clips(sorted_videos) → List[Dict]
+    1. Skanuje original_dir, zbiera stems plików z CAPS → Set[str] (lowercase)
+    2. Dla każdego video w sorted_videos: dopasowuje stem (bez _480p15) do caps_stems
+    3. Zwraca listę analiz które MUSZĄ być w montażu
+
+  MontageSelector.select_montage(slots, analyses) → List[Dict]
+    Wynik: lista cut_entry (patrz storyboard.json format poniżej)
+    Kluczowe pola cut_entry: cut_idx, timeline_start/end, duration,
+      source_file (proxy name), proxy_path, source_start, source_end,
+      source_clip_duration, score, highlight_base_score, shot_type,
+      max_people, motion_score, event_time, event_progress, reason,
+      music_energy, is_drop
+    Specjalne: source_type="image", image_path (dla outro z obrazka)
+
+--- render/preview.py ---
+Sprawdza cut.get("source_type") == "image" → używa -loop 1 -i img zamiast proxy
+Normalny klip: -ss source_start -i proxy_path -t duration
+Parametry z config.preview_settings: cq (default 34), preset (default p1)
+Temp segmenty → concat list → mix z muzyką
+
+--- render/final_render.py ---
+Analogicznie do preview, ale:
+  - find_matching_original() → szuka 4K oryginału
+  - Kodek: hevc_nvenc (lub h264_nvenc lub libx264 fallback)
+  - Skala dla obrazu: 3840:2160 (zamiast 854:480)
+  - -r 60 (zamiast 15)
+
+--- sync_proxies.py ---
+Standalone skrypt (nie wymaga venv do uruchomienia, ale używa go przez run.bat).
+Tryby: normalny (wykonuje zmiany) i --dry-run (tylko raport)
+Funkcja proxy_name_for(original): original.stem.lower() + "_480p15.mp4"
+Kompresja proxy: libx264 (CPU, nie GPU — bo GPU może być zajęte), crf28, 854x480
+
+--- export_clips.py ---
+Czyta storyboard.json, dla każdego cut wycina:
+  clips_4k/NNN_<nazwa>.mp4  — hevc_nvenc z oryginału
+  clips_480p/NNN_<nazwa>.mp4 — copy z proxy (albo libx264 fallback)
+Przydatny do ręcznego przeglądu poszczególnych ujęć.
+
+================================================================================
+5. KONFIGURACJA (config.yaml) — WSZYSTKIE OPCJE
+================================================================================
+
+[paths]
+  proxy_dir:     "kopie_robocze_480p"    (względna lub absolutna ścieżka)
+  original_dir:  "materialy_oryginalne"
+  music_dir:     "sciezkadzwiekowa"
+  music_file:    "" (puste = pierwszy MP3 w music_dir, lub pełna ścieżka/nazwa pliku)
+  cache_dir:     "analysis"
+  storyboard_dir: "storyboard"
+  preview_dir:   "preview"
+  output_dir:    "output"
+  outro_image:   "../Obrazek_koncowy/obrazek_koncowy.jpg" (puste = brak, lub ścieżka do JPG/PNG — zastępuje ostatnie ujęcie statycznym obrazem)
+
+[outro_video_keyword]
+  outro_video_keyword: ""  (puste = brak outro wideo, lub słowo kluczowe w nazwie klipu)
+  Przykłady: "powrot", "wyjazd", "outro", "koniec", "driving"
+  ← klip z tym słowem kluczowym jest zarezerwowany jako ostatnie ujęcie
+  ← działa tylko gdy outro_image jest puste
+  ← case-insensitive match
+
+[video_analysis]
+  sample_interval_sec: 0.2   (co 0.2s analizuj klatkę proxy)
+  yolo_model: "yolov8n.pt"   (yolov8n=szybki, yolov8s/m=dokładniejszy)
+  device: "cuda"             (lub "cpu" — CUDA daje 10x szybsze YOLO)
+  batch_size: 16
+  highlight_window_sizes: [1.0, 1.5, 2.0, 3.0, 4.0]  (rozmiary okien NMS)
+  scene_threshold: 27.0
+  min_scene_duration_sec: 0.8
+
+[scoring_weights]  (0.0–1.0, suma nie musi = 1.0)
+  sharpness: 0.20    — wariancja Laplaciana
+  people: 0.35       — liczba osób (główna waga)
+  motion: 0.25       — Optical Flow magnitude
+  composition: 0.20  — wyśrodkowanie osób w kadrze
+  blur_penalty: 0.35
+  exposure_penalty: 0.30
+  camera_shake_penalty: 0.25
+
+[music_analysis]
+  onset_sensitivity: 0.5
+  beats_per_bar: 4
+  energy_smoothing_sec: 0.5
+  energy_thresholds:
+    calm: 0.30
+    medium: 0.60
+    high: 0.80
+    drop_peak: 0.85   (powyżej = drop/climax)
+
+[montage_rules]
+  min_cut_duration_sec: 1.20   ← ANTYEPILEPTYCZNY LIMIT (nie ruszaj poniżej 1.2!)
+  cut_durations:
+    drop_or_climax: {min_sec: 1.20, max_sec: 2.20, beat_interval: 4}
+    high_energy:    {min_sec: 1.50, max_sec: 2.80, beat_interval: 4}
+    medium_energy:  {min_sec: 2.20, max_sec: 4.20, beat_interval: 8}
+    calm:           {min_sec: 3.50, max_sec: 6.50, beat_interval: 12}
+  snap_to_beat: true
+  snap_tolerance_sec: 0.15
+  reserve_top_highlights_for_drops_ratio: 0.15
+  chronology:
+    enabled: true
+    weight: 50.0                  (kara za odchylenie od osi czasu imprezy)
+    local_window_tolerance: 0.12  (tolerancja ±12% osi czasu)
+    backward_jump_penalty: 35.0
+  penalties:
+    consecutive_shot_type_penalty: 30.0  (kara za powtórzenie Close-up→Close-up itp.)
+    clip_reuse_penalty: 60.0
+    max_source_clip_uses: 1              (każdy klip użyty max raz)
+
+[rendering]
+  preview:
+    resolution: [640, 360]
+    fps: 15
+    codec: "h264_nvenc"
+    cq: 34              (34=draft, 28=lepiej, 20=wysokie)
+    preset: "p1"        (p1=najszybszy, p7=najlepszy)
+    audio_bitrate: "128k"
+  final:
+    resolution: [3840, 2160]
+    fps: 60
+    codec: "hevc_nvenc"  (lub "h264_nvenc" — H.264 szybszy, H.265 mniejszy plik)
+    cq: 19               (19=wysoka jakość, 14=bardzo wysoka)
+    preset: "p6"
+    tune: "hq"
+    audio_codec: "aac"
+    audio_bitrate: "320k"
+    hwaccel: "cuda"
+
+================================================================================
+6. ALGORYTMY KLUCZOWE
+================================================================================
+
+[A] CHRONOLOGICZNE SORTOWANIE KLIPÓW
+  extract_event_timestamp("29_130535_...") → 29*86400 + 13*3600 + 05*60 + 35 = 2556335
+  Pliki posortowane → file_idx 0..N-1 → event_progress 0.0..1.0
+  target_idx dla slotu s: int(s_idx * (N-1) / (S-1))
+  Wynik: klipy z rana → początki montażu, wieczorne → końcówka
+
+[B] MONOTONIC SLIDING WINDOW
+  last_vid_idx = 0 (rośnie, nigdy nie cofa)
+  Dla s_idx=0: szukaj w oknie [max(0, target-2) .. min(N, target+1)]
+  Jeśli nie znaleziono → rozszerz okno: 2→4→8→15→30→all
+  Penalty: score -= abs(file_idx - target_idx) * 0.8
+  Po wyborze: last_vid_idx = max(last_vid_idx, chosen.file_idx)
+  EFEKT: zero skoków wstecz w chronologii
+
+[C] GWARANCJA KLIPÓW CAPS
+  Skanuj ORYGINALY/ → stem.lower() do set jeśli re.search(r"[A-Z]", stem)
+  Dopasuj do analiz: proxy_stem = re.sub(r"_480p\d*$", "", stem, IGNORECASE).lower()
+  Dla każdego CAPS-klipu: target_slot = file_idx * (S-1) / (N-1)
+  Zajmij slot (z dryf-odsuniéciem jeśli kolizja), force-assign highlight
+  score += 50.0, reason="CAPS_wymagany"
+
+[D] SCORING DOPASOWANIA (MontageScorer.calculate_match_score)
+  base_score = highlight.score (wynik analizy wideo)
+  + energy_bonus (drop+motion → +20, top_highlight → +35)
+  + shot_type bonus (medium shot na dropa → +10)
+  - recent_history penalty (ostatnie 4 ujęcia: shot_type == current → -30)
+  - clip_reuse penalty (ten sam plik użyty wcześniej → -60)
+  - idx_diff penalty (odchylenie od target_idx → -0.8 per indeks)
+  Zwraca (total_score, reason_string)
+
+[E] STATYCZNY OBRAZ OUTRO
+  Jeśli config.outro_image_path i plik istnieje:
+    FFmpeg: -loop 1 -i img.jpg -t SLOT_DUR -vf scale=W:H:force_original_aspect_ratio=decrease,pad=...
+    Zapisywane w storyboard.json jako: source_type="image", image_path=...
+  Sprawdzane w KAŻDYM renderer (preview i final) przez:
+    if cut.get("source_type") == "image": ...
+
+================================================================================
+7. KLUCZOWE DECYZJE PROJEKTOWE (HISTORIA ZMIAN)
+================================================================================
+
+[2026-09-01] IMPLEMENTACJA PODSTAWOWA
+  - Pipeline: analyze → analyze-music → storyboard → preview → render
+  - YOLOv8n na CPU (GPU zajęty przez NVENC)
+  - Proxy 480p/15fps = 10–20x szybsza analiza niż 4K
+
+[2026-09-01] FIX: Brak chronologii (gala wieczorna mieszana z rano)
+  - Problem: algorytm wybierał globalnie "najlepsze" ujęcia bez uwzględnienia czasu
+  - Rozwiązanie: Monotonic Sliding Window z penalty za odchylenie od target_idx
+  - Efekt: storyboard ułożony chronologicznie od 28.08 rano do 30.08
+
+[2026-09-01] FIX: Zbyt krótkie ujęcia (<0.5s → ryzyko epilepsji)
+  - min_cut_duration_sec: 1.20 w config.yaml (twarda granica)
+  - TimelineBuilder respektuje to przy każdym slocie
+
+[2026-09-02] MUZYKA: zmiana na "Płomień (Catchy Power Remix)(3).mp3"
+  - BPM=136, 9 dropów w 3:32–4:34
+
+[2026-09-02] OUTRO: statyczny obraz zamiast klipu wideo
+  - Dodano config.paths.outro_image
+  - selector.py: jeśli obraz istnieje → force cut z source_type="image"
+  - preview.py i final_render.py: obsługa source_type=="image"
+  - Obraz: Obrazek_koncowy/obrazek_koncowy.jpg
+
+[2026-09-02] SYNC PROXY: sync_proxies.py
+  - Standalone skrypt, --dry-run tryb
+  - Wykrywa orphan proxy (proxy bez oryginału) i usuwa je
+  - Wykryto 6 orphan proxy z poprzednich sesji
+
+[2026-09-02] GWARANCJA CAPS: selector._find_required_caps_clips()
+  - Wykryte pliki CAPS: 29_125240_piata_mowczyni_na_scenie_B.mp4
+                        29_130535_ludzie_zbieraja_sie_na_sciance_C.mp4
+  - Oba dostają zarezerwowane sloty
+
+[2026-09-02] BATÓWKI: ZROB_PREVIEW.bat i ZROB_RENDER_4K.bat
+  - 4 kroki: sync→analyze→storyboard→render
+  - Bez auto-otwierania pliku po zakończeniu (usunięto "start """)
+  - Usunięto "chcp 65001" (powodował błędy parsowania CMD)
+
+================================================================================
+8. ZNANE OGRANICZENIA I MIEJSCA DO POPRAWY
+================================================================================
+
+[ZNANE PROBLEMY]
+1. "29_103616_ludzie_klaszcza_480p15.mp4" — proxy istnieje, ale brak oryginału w ORYGINALY/
+   → system gracefully skip podczas 4K render, loguje ERROR
+   → sync_proxies.py zgłasza ten plik jako orphan (do usunięcia)
+
+2. YOLOv8 uruchamiany na CPU (device: "cpu" w kodzie po zainicjowaniu)
+   Powód: CUDA może być zajęte przez NVENC; warto sprawdzić czy da się uruchomić równolegle
+   Potencjalna zmiana: config.video_analysis.device: "cuda" → może przyspieszyć analyze 5x
+
+3. Analiza wideo (ETAP 2) trwa długo przy 209 klipach (~15-30 min przy pierwszym uruchomieniu)
+   Po pierwszym uruchomieniu: cache JSON → wczytywanie w sekundy
+
+4. ZROB_PREVIEW.bat i ZROB_RENDER_4K.bat zawsze uruchamiają ETAP "analyze"
+   → Jeśli nie ma nowych klipów, analyze szybko wykryje cache i pominie re-analizę
+   → Jeśli są nowe klipy — muszą być najpierw proxy (sync_proxies)
+
+5. Storyboard.json generowany na nowo przy każdym uruchomieniu ZROB_*.bat
+   → Może być inny przy każdym uruchomieniu (randomowy element scoringu)
+   → Jeśli storyboard jest zaakceptowany i chcesz tylko render: użyj "run.bat render"
+     (bez create-storyboard) żeby nie generować nowego
+
+[MOŻLIWE ULEPSZENIA]
+A. Fade in/out między ujęciami (FFmpeg xfade filter)
+B. Wykrywanie twarzy zamiast ogólnej detekcji osób (close-up osoby vs ogólna scena)
+C. Kolorystyczna spójność ujęć (histogram matching)
+D. Ręczna lista "must include" (nie tylko CAPS, ale też dowolne klipy po nazwie)
+E. Multi-track audio (oryginalne audio ściszone pod muzyką)
+F. Automatyczne titling (tekst z datą/godziną na pierwszym ujęciu każdego dnia)
+G. Tryb "no-reorder" dla storyboardu (zachowaj poprzedni storyboard, tylko re-render)
+H. Export klipów CAPS osobno z flagą --only-caps w export_clips.py
+
+================================================================================
+9. JAK SZYBKO ZROZUMIEĆ AKTUALNY STORYBOARD
+================================================================================
+
+Plik: AI_MONTAGE/storyboard/storyboard.txt
+  — czytelna lista wszystkich 100 ujęć
+  — każda linia: CUT NNN | czas muzyki | source_file | src_start | dur | reason
+
+Plik: AI_MONTAGE/storyboard/storyboard.json
+  — maszynowy format dla renderera
+  — klucze: "cuts" (lista), "music_info" (BPM, drops etc.)
+  — każdy cut: patrz sekcja 6, algorytm [B]
+
+Chronologiczny podział 100 ujęć (storyboard z 2026-09-02):
+  CUT   0–24  → Piątek 28.08 (rejestracja, wejście, sala, mówcy)
+  CUT  25–63  → Sobota 29.08 (rano, warsztaty, godziny 9:30–13:30)
+  CUT  64–87  → Sobota 29.08 gala wieczorna
+  CUT  88–94  → Sobota/Niedziela (tańce do późna)
+  CUT  95–99  → Niedziela 30.08 (nagrody)
+  CUT  99     → OUTRO: statyczny obrazek_koncowy.jpg (~2.3s)
+
+================================================================================
+10. KOMENDY URUCHOMIENIOWE
+================================================================================
+
+Środowisko: wenv w katalogu AI_MONTAGE/venv/
+Aktywacja ręczna: call venv\Scripts\activate.bat
+
+Przez run.bat (autoaktywacja venv):
+  run.bat analyze             — analiza wideo (z cache, pomija już przeanalizowane)
+  run.bat analyze-music       — analiza BPM i energii MP3
+  run.bat create-storyboard   — nowy storyboard (UWAGA: generuje nowy za każdym razem)
+  run.bat preview             — render 480p draft (~27s)
+  run.bat render              — render 4K master (~7-10 min)
+  run.bat all                 — etapy 1-5 (bez render)
+  run.bat sync-proxies        — synchronizacja ANALIZA_480P ↔ ORYGINALY
+  run.bat sync-proxies --dry-run  — tylko podgląd, bez zmian
+  run.bat export-clips        — wycina ujęcia do clips_4k/ i clips_480p/
+  run.bat export-clips --only-proxy  — tylko clips_480p/ (szybko)
+
+Przez batówki (zalecane dla użytkownika):
+  ZROB_PREVIEW.bat    — sync→analyze→storyboard→preview (pyta "dowolny klawisz")
+  ZROB_RENDER_4K.bat  — sync→analyze→storyboard→render4K (pyta przed startem)
+
+Standalone skrypty Python:
+  python sync_proxies.py --dry-run
+  python export_clips.py --only-proxy
+  python export_clips.py --only-4k
+
+Przydatne flagi main.py:
+  --force    → ignoruje cache analysis, re-analizuje wszystkie pliki od nowa
+  --music PATH → używa innego pliku MP3 (bez zmiany config.yaml)
+  --config PATH → używa innego pliku konfiguracyjnego
+
+================================================================================
+WYGENEROWANO AUTOMATYCZNIE przez agenta AI w sesji konwersacji:
+  c6ccb607-f69a-4d73-8694-796fd9dfeec2
+  Data sesji: 2026-09-02/03
+  Agent: Antigravity (Google DeepMind)
+================================================================================

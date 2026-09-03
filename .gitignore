@@ -1,0 +1,106 @@
+# ==============================================================================
+# .gitignore — AI Automatic Music Montage
+# ==============================================================================
+
+# --- Python ---
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+.Python
+pip-log.txt
+
+# --- IDE / edytory ---
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+
+# --- Zmienne środowiskowe ---
+.env
+.env.local
+
+# ==============================================================================
+# PLIKI GENEROWANE PRZEZ PROJEKT (można je odtworzyć komendami)
+# ==============================================================================
+
+# Cache analizy wideo — generowany przez: run.bat analyze
+analysis/
+
+# Storyboard — generowany przez: run.bat create-storyboard
+storyboard/
+
+# Preview — generowany przez: run.bat preview
+preview/
+
+# Finalny render — generowany przez: run.bat render
+output/
+
+# Fragmenty ujęć — generowane przez: run.bat export-clips
+clips_4k/
+clips_480p/
+
+# ==============================================================================
+# MODELE AI (pobierane automatycznie przez bibliotekę ultralytics)
+# ==============================================================================
+*.pt
+*.onnx
+models/
+
+# ==============================================================================
+# LOGI I PLIKI TYMCZASOWE
+# ==============================================================================
+montage.log
+*.log
+concat_*.txt
+temp_segments/
+*.tmp
+
+# ==============================================================================
+# SYSTEM WINDOWS
+# ==============================================================================
+Thumbs.db
+Thumbs.db:encryptable
+desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# ==============================================================================
+# macOS
+# ==============================================================================
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# ==============================================================================
+# LINUX
+# ==============================================================================
+*~
+.fuse_hidden*
+.Trash-*
+
+# ==============================================================================
+# DUŻE PLIKI MEDIÓW (znajdują się wewnątrz AI_MONTAGE/)
+# ==============================================================================
+
+# Oryginalne nagrania 4K (za duże na git — dziesiątki GB)
+materialy_oryginalne/
+
+# Proxy video 480p (generowane przez: run.bat sync-proxies)
+kopie_robocze_480p/
+
+# Pliki muzyczne MP3 (prawa autorskie / duże pliki binarne)
+sciezkadzwiekowa/
+
+# Statyczny obraz outro (opcjonalny)
+# Obrazek_koncowy/
+
