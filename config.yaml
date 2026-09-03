@@ -58,19 +58,24 @@ outro_video_keyword: ""
 #
 # Każda pozycja na liście:
 #   file: (wymagane) dokładna nazwa pliku (patrz wyżej)
-#   time: (opcjonalne) żądany czas pojawienia się ujęcia w gotowym filmie
-#         Formaty: "1:30" = 1 min 30 sek | "90" = 90 sekund | "2:15:00" = 2h 15min
-#         Jeśli pominięte, ujęcie zostanie umieszczone chronologicznie
-#         (na podstawie daty i godziny nagrania)
+#   music_time: (opcjonalne) żądany czas pojawienia się ujęcia w gotowym filmie / podkładzie
+#               Formaty: "1:30" = 1 min 30 sek | "90" = 90 sekund | "2:15:00" = 2h 15min
+#               (uwaga: działa także pole 'time' jako alias do 'music_time')
+#               Jeśli pominięte, ujęcie zostanie umieszczone chronologicznie wg osi czasu
+#   clip_time:  (opcjonalne) punkt startowy wewnątrz Twojego nagrania (od kiedy wycinać)
+#               Formaty: "0:03" = od 3. sekundy | "15" = od 15. sekundy nagrania
+#               Wszystko przed tą chwilą zostanie pominięte!
+#               Długość wycinka dobierze algorytm w rytm muzyki.
 #
 # Przykłady:
 #   forced_clips:
 #     - file: "29_125240_piata_mowczyni_na_scenie_b"
-#       time: "1:30"
+#       music_time: "1:30"          # chwila w filmie
+#       clip_time: "0:03"           # zacznij wycinać od 3. sekundy tego klipu
 #     - file: "29_130535_ludzie_zbieraja_sie_na_sciance_c"
-#       time: "2:00"
+#       music_time: "2:00"
 #     - file: "28_193407_kolacja_wieczorna"
-#       # brak time = umieszczenie automatyczne wg chronologii
+#       clip_time: "0:12"           # auto-chronologia na osi czasu, ale od 12. sekundy wideo
 # ==============================================================================
 forced_clips: []
 

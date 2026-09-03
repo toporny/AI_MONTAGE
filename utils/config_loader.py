@@ -33,15 +33,21 @@ class Config:
         # Słowo kluczowe outro wideo — klip z tym słowem w nazwie będzie ostatnim ujęciem
         self.outro_video_keyword: str = str(raw_config.get("outro_video_keyword", "")).strip()
 
-        # Lista wymuszonych ujęć: [{file: str, time_sec: float|None}, ...]
+        # Lista wymuszonych ujęć: [{file: str, music_time_sec: float|None, clip_time_sec: float|None}, ...]
         forced_raw = raw_config.get("forced_clips", []) or []
         self.forced_clips: List[Dict[str, Any]] = []
         for entry in forced_raw:
             if not isinstance(entry, dict) or "file" not in entry:
                 continue
+            # music_time może być podane jako 'music_time' lub wstecznie kompatybilne 'time'
+            raw_music_time = entry.get("music_time", entry.get("time", None))
+            raw_clip_time = entry.get("clip_time", None)
+
             self.forced_clips.append({
                 "file": str(entry["file"]).strip(),
-                "time_sec": self._parse_time_to_sec(entry.get("time", None))
+                "time_sec": self._parse_time_to_sec(raw_music_time),
+                "music_time_sec": self._parse_time_to_sec(raw_music_time),
+                "clip_time_sec": self._parse_time_to_sec(raw_clip_time)
             })
 
         # Video Analysis

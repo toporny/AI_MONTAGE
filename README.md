@@ -338,13 +338,14 @@ Program wybierze z nich najlepszy fragment (ostrość, osoby, ruch) i przytnie d
 ```yaml
 forced_clips:
   - file: "29_125240_piata_mowczyni_na_scenie_b"
-    time: "1:30"                # żądany czas w gotowym filmie (mm:ss)
+    music_time: "1:30"          # żądany czas w gotowym filmie (mm:ss lub sekundy)
+    clip_time: "0:03"           # zacznij wycinać od 3. sekundy tego klipu (pomiń początek)
 
   - file: "29_130535_ludzie_zbieraja_sie_na_sciance_c"
-    time: "2:00"
+    music_time: "2:00"
 
   - file: "28_193407_kolacja_wieczorna"
-    # brak time = umieszczenie automatyczne wg chronologii nagrania
+    clip_time: "0:15"           # brak music_time = auto-chronologia na osi utworu, ale wycięte od 15. sekundy nagrania
 ```
 
 > [!IMPORTANT]
@@ -362,12 +363,13 @@ forced_clips:
 
 ### Zasady działania
 
-| Parametr | Opis |
-|----------|------|
-| `file` | Dokładna nazwa pliku z `kopie_robocze_480p/` - bez `_480p15` i bez `.mp4`. Możesz też wpisać z sufiksem - program sam go odtnie. |
-| `time` | Żądany czas pojawienia się w filmie. Formaty: `"1:30"` (1 min 30s), `"90"` (90 sekund), `"1:30:00"` (1h 30min) |
+| Parametr | Wymagany? | Opis |
+|----------|-----------|------|
+| `file` | **TAK** | Dokładna nazwa pliku z `kopie_robocze_480p/` — bez `_480p15` i bez `.mp4`. Możesz też wpisać z sufiksem — program sam go odtnie. |
+| `music_time` | Opcjonalny | Chwila czasowa w gotowym filmie / podkładzie muzycznym, kiedy ujęcie ma się pojawić. Formaty: `"1:30"` (1 min 30s), `"90"` (90 sekund). *(Działa także dawny alias `time`)*. |
+| `clip_time` | Opcjonalny | Punkt startowy wewnątrz Twojego nagrania (np. `"0:03"` lub `"15"`). Pomija wszystko co przed nim! Algorytm sam dobierze odpowiednią długość trwania sceny w rytm muzyki. |
 
-- Ujęcie jest **przycinane** do długości slotu (~1–6s zależnie od energii muzyki)
+- Ujęcie jest **przycinane** do długości slotu (~1–6s zależnie od energii muzyki) — nie musisz martwić się o wyliczanie końca ujęcia.
 - Ujęcie pojawi się **w pobliżu** żądanego czasu - dokładna pozycja zależy od siatki beatów muzyki
 - Jeśli dwa wymuszone ujęcia mają ten sam slot - drugie zostaje przesunięte do następnego wolnego
 
