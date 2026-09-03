@@ -110,8 +110,7 @@ Katalogi z materiałami (wewnątrz AI_MONTAGE):
   materialy_oryginalne/ — oryginalne pliki 4K/60fps (203 pliki)
   kopie_robocze_480p/   — proxy 480p/15fps (209 plików, _480p15.mp4 suffix)
   sciezkadzwiekowa/     — pliki MP3
-Katalogi poza AI_MONTAGE:
-  Obrazek_koncowy/      — obrazek_koncowy.jpg (statyczne outro)
+  outro_image/          — outro.jpg (statyczne outro wideo/plansza)
 
 ================================================================================
 3. ARCHITEKTURA I PIPELINE — KOLEJNOŚĆ ETAPÓW
@@ -288,7 +287,7 @@ Przydatny do ręcznego przeglądu poszczególnych ujęć.
   storyboard_dir: "storyboard"
   preview_dir:   "preview"
   output_dir:    "output"
-  outro_image:   "../Obrazek_koncowy/obrazek_koncowy.jpg" (puste = brak, lub ścieżka do JPG/PNG — zastępuje ostatnie ujęcie statycznym obrazem)
+  outro_image:   "outro_image/outro.jpg" (puste = brak, lub ścieżka do JPG/PNG — zastępuje ostatnie ujęcie statycznym obrazem)
 
 [outro_video_keyword]
   outro_video_keyword: ""  (puste = brak outro wideo, lub słowo kluczowe w nazwie klipu)
@@ -430,7 +429,7 @@ Przydatny do ręcznego przeglądu poszczególnych ujęć.
   - Dodano config.paths.outro_image
   - selector.py: jeśli obraz istnieje → force cut z source_type="image"
   - preview.py i final_render.py: obsługa source_type=="image"
-  - Obraz: Obrazek_koncowy/obrazek_koncowy.jpg
+  - Obraz: outro_image/outro.jpg
 
 [2026-09-02] SYNC PROXY: sync_proxies.py
   - Standalone skrypt, --dry-run tryb
@@ -501,7 +500,7 @@ Chronologiczny podział 100 ujęć (storyboard z 2026-09-02):
   CUT  64–87  → Sobota 29.08 gala wieczorna
   CUT  88–94  → Sobota/Niedziela (tańce do późna)
   CUT  95–99  → Niedziela 30.08 (nagrody)
-  CUT  99     → OUTRO: statyczny obrazek_koncowy.jpg (~2.3s)
+  CUT  99     → OUTRO: statyczny outro_image/outro.jpg (~2.3s)
 
 ================================================================================
 10. KOMENDY URUCHOMIENIOWE

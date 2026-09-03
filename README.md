@@ -11,7 +11,7 @@ Wszystkie pliki wejściowe umieszczasz bezpośrednio w podkatalogach wewnątrz f
 
 * 🎬 **Oryginalne nagrania wideo (4K/HD):** wrzuć do `materialy_oryginalne/` (formaty `.mp4`, `.mov`, `.mkv` itp.)
 * 🎵 **Podkład muzyczny:** wrzuć plik audio (np. `.mp3`) do `sciezkadzwiekowa/`
-* 🖼️ *(Opcjonalnie)* **Statyczny obraz końcowy (outro):** np. plansza z logo/napisem JPG/PNG w folderze `../Obrazek_koncowy/` lub w dowolnym innym miejscu wskazanym w `config.yaml`
+* 🖼️ *(Opcjonalnie)* **Statyczny obraz końcowy (outro):** np. plansza z logo/napisem JPG/PNG w folderze `outro_image/outro.jpg` lub w dowolnym innym miejscu wskazanym w `config.yaml`
 
 > [!TIP]
 > Nie musisz ręcznie przygotowywać plików o małej rozdzielczości - program przy pierwszym uruchomieniu sam utworzy lekkie kopie robocze 480p w folderze `kopie_robocze_480p/`, aby błyskawicznie przeanalizować obraz pod kątem AI!
@@ -313,7 +313,7 @@ AI_MONTAGE/
 ├── materialy_oryginalne/       # Oryginalne pliki 4K/60fps (źródło renderowania)
 ├── kopie_robocze_480p/         # Skompresowane proxy 480p/15fps (źródło analizy AI)
 ├── sciezkadzwiekowa/           # Pliki muzyczne MP3
-└── Obrazek_koncowy/            # (opcjonalne, w katalogu nadrzędnym) Statyczny obraz outro JPG/PNG
+└── outro_image/                # (opcjonalne) Statyczny obraz outro (outro.jpg)
 ```
 
 > [!IMPORTANT]

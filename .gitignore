@@ -101,6 +101,6 @@ kopie_robocze_480p/
 # Pliki muzyczne MP3 (prawa autorskie / duże pliki binarne)
 sciezkadzwiekowa/
 
-# Statyczny obraz outro (opcjonalny)
-# Obrazek_koncowy/
+# Statyczny obraz outro (opcjonalny, mały plik JPG/PNG - można commitować lub zignorować)
+# outro_image/
 

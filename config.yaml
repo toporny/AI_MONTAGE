@@ -29,8 +29,8 @@ paths:
 
   # Statyczny obraz końcowy zastępujący ostatnie ujęcie montażu (opcjonalne)
   # Zostaw puste ("") jeśli chcesz używać normalnego klipu wideo jako outro
-  # Przykład: "../Obrazek_koncowy/obrazek_koncowy.jpg"
-  outro_image: "../Obrazek_koncowy/obrazek_koncowy.jpg"
+  # Przykład: "outro_image/outro.jpg"
+  outro_image: "outro_image/outro.jpg"
 
 # OUTRO WIDEO (alternatywa dla outro_image)
 # Słowo kluczowe w nazwie pliku proxy — klip zawierający to słowo
