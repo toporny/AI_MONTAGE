@@ -63,6 +63,7 @@ montage.log
 concat_*.txt
 temp_segments/
 *.tmp
+*_tmp.txt
 
 # ==============================================================================
 # SYSTEM WINDOWS

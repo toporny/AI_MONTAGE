@@ -33,13 +33,14 @@ def main():
     
     parser.add_argument(
         "command",
-        choices=["analyze", "analyze-music", "create-storyboard", "preview", "render", "all"],
+        choices=["analyze", "analyze-music", "create-storyboard", "preview", "render", "openshot", "all"],
         help="Komenda do wykonania:\n"
              "  analyze           - Skanuje i analizuje pliki wideo proxy 480p\n"
              "  analyze-music     - Analizuje BPM, beaty i dynamikę muzyki MP3\n"
              "  create-storyboard - Generuje storyboard.json oraz storyboard.txt\n"
              "  preview           - Renderuje szybki podgląd 480p z proxy\n"
              "  render            - Renderuje finalny film 4K / 60 FPS z oryginałów\n"
+             "  openshot          - Generuje plik projektu OpenShot (.osp) ze storyboardu\n"
              "  all               - Uruchamia wszystkie etapy po kolei"
     )
 
@@ -140,6 +141,19 @@ def main():
 
         final_file = final_renderer.render_final_master(sb_data)
         if not final_file:
+            sys.exit(1)
+
+    # ==========================================
+    # ETAP 7: EKSPORT PROJEKTU OPENSHOT (.OSP)
+    # ==========================================
+    if cmd == "openshot":
+        sb_data = storyboard_mgr.load_storyboard()
+        if not sb_data:
+            console.print("[bold red]Błąd: Brak pliku storyboard.json. Uruchom: python main.py create-storyboard[/bold red]")
+            sys.exit(1)
+
+        res_4k, res_480p = storyboard_mgr.openshot_exporter.export_both_projects(sb_data)
+        if not res_4k and not res_480p:
             sys.exit(1)
 
     if cmd == "all":

@@ -23,37 +23,19 @@ if not exist "venv\Scripts\activate.bat" (
 
 call venv\Scripts\activate.bat
 
-echo [1/4] Synchronizacja proxy 480p z oryginalami...
-python sync_proxies.py
-if errorlevel 1 (
+if not exist "storyboard\storyboard.json" (
     echo.
-    echo BLAD: Synchronizacja proxy nie powiodla sie!
+    echo BLAD: Brak pliku storyboard\storyboard.json!
+    echo Uruchom najpierw ZROB_PREVIEW.bat, aby wygenerowac storyboard i sprawdzic podglad.
+    echo.
     pause
     exit /b 1
 )
 
 echo.
-echo [2/4] Analiza klipow (aktualizacja JSON)...
-python main.py analyze
-if errorlevel 1 (
-    echo.
-    echo BLAD: Analiza klipow nie powiodla sie!
-    pause
-    exit /b 1
-)
-
+echo Uruchamianie finalnego renderu 4K / 60 FPS na podstawie istniejacego storyboard.json...
+echo (Nie modyfikuje analizy muzyki ani storyboardu)
 echo.
-echo [3/4] Generowanie storyboardu...
-python main.py create-storyboard
-if errorlevel 1 (
-    echo.
-    echo BLAD: Nie udalo sie wygenerowac storyboardu!
-    pause
-    exit /b 1
-)
-
-echo.
-echo [4/4] Finalny render 4K / 60 FPS (NVIDIA NVENC)...
 python main.py render
 if errorlevel 1 (
     echo.

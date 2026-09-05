@@ -144,7 +144,9 @@ run.bat create-storyboard
 ```
 *Wygeneruje pliki:*
 - `storyboard/storyboard.txt` *(czytelna dla człowieka lista ujęć, czasów, punktów cięcia i powodów wyboru)*
-- `storyboard/storyboard.json` *(dane dla renderera)*
+- `storyboard/storyboard.json` *(dane dla wbudowanego silnika renderującego)*
+- `storyboard/montage_openshot_4K.osp` *(projekt OpenShot 4.0.0 podpięty pod oryginalne pliki 4K)*
+- `storyboard/montage_openshot_480p.osp` *(projekt OpenShot 4.0.0 podpięty pod lekkie proxy 480p)*
 
 ### 4. Generowanie szybkiego podglądu 480p
 ```cmd
@@ -338,14 +340,12 @@ Program wybierze z nich najlepszy fragment (ostrość, osoby, ruch) i przytnie d
 ```yaml
 forced_clips:
   - file: "29_125240_piata_mowczyni_na_scenie_b"
-    music_time: "1:30"          # żądany czas w gotowym filmie (mm:ss lub sekundy)
     clip_time: "0:03"           # zacznij wycinać od 3. sekundy tego klipu (pomiń początek)
 
   - file: "29_130535_ludzie_zbieraja_sie_na_sciance_c"
-    music_time: "2:00"
 
   - file: "28_193407_kolacja_wieczorna"
-    clip_time: "0:15"           # brak music_time = auto-chronologia na osi utworu, ale wycięte od 15. sekundy nagrania
+    clip_time: "0:15"           # punkt startowy: 15. sekunda nagrania
 ```
 
 > [!IMPORTANT]
@@ -366,10 +366,9 @@ forced_clips:
 | Parametr | Wymagany? | Opis |
 |----------|-----------|------|
 | `file` | **TAK** | Dokładna nazwa pliku z `kopie_robocze_480p/` — bez `_480p15` i bez `.mp4`. Możesz też wpisać z sufiksem — program sam go odtnie. |
-| `music_time` | Opcjonalny | Chwila czasowa w gotowym filmie / podkładzie muzycznym, kiedy ujęcie ma się pojawić. Formaty: `"1:30"` (1 min 30s), `"90"` (90 sekund). *(Działa także dawny alias `time`)*. |
 | `clip_time` | Opcjonalny | Punkt startowy wewnątrz Twojego nagrania (np. `"0:03"` lub `"15"`). Pomija wszystko co przed nim! Algorytm sam dobierze odpowiednią długość trwania sceny w rytm muzyki. |
 
-* **Gdy podasz tylko `file` (bez `music_time` i bez `clip_time`):**
+* **Gdy podasz tylko `file` (bez `clip_time`):**
   * Ujęcie trafi na oś czasu **automatycznie i chronologicznie** (zgodnie z datą/godziną nagrania).
   * Algorytm AI **samodzielnie przeskanuje klip i wybierze z niego najlepszy moment** (najwyższy score: ostrość, twarze, stabilność).
 * **Długość wycinka:** Zawsze dobierana jest automatycznie w rytm muzyki (~1.2–6s zależnie od energii) — nie musisz ręcznie wyliczać klatki końcowej!

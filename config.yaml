@@ -57,26 +57,58 @@ outro_video_keyword: ""
 #
 # Każda pozycja na liście:
 #   file: (wymagane) dokładna nazwa pliku (patrz wyżej)
-#   music_time: (opcjonalne) żądany czas pojawienia się ujęcia w gotowym filmie / podkładzie
-#               Formaty: "1:30" = 1 min 30 sek | "90" = 90 sekund | "2:15:00" = 2h 15min
-#               (uwaga: działa także pole 'time' jako alias do 'music_time')
-#               Jeśli pominięte, ujęcie zostanie umieszczone chronologicznie wg osi czasu
 #   clip_time:  (opcjonalne) punkt startowy wewnątrz Twojego nagrania (od kiedy wycinać)
 #               Formaty: "0:03" = od 3. sekundy | "15" = od 15. sekundy nagrania
 #               Wszystko przed tą chwilą zostanie pominięte!
 #               Długość wycinka dobierze algorytm w rytm muzyki.
+#               Pozycja ujęcia na osi utworu jest dobierana automatycznie chronologicznie.
 #
 # Przykłady:
 #   forced_clips:
 #     - file: "29_125240_piata_mowczyni_na_scenie_b"
-#       music_time: "1:30"          # chwila w filmie
 #       clip_time: "0:03"           # zacznij wycinać od 3. sekundy tego klipu
 #     - file: "29_130535_ludzie_zbieraja_sie_na_sciance_c"
-#       music_time: "2:00"
 #     - file: "28_193407_kolacja_wieczorna"
-#       clip_time: "0:12"           # auto-chronologia na osi czasu, ale od 12. sekundy wideo
+#       clip_time: "0:12"           # od 12. sekundy wideo
 # ==============================================================================
-forced_clips: []
+forced_clips:
+  - file: "29_125240_piata_mowczyni_na_scenie_b"
+    clip_time: "0:03"
+  - file: "29_235041_magda_geba_i"
+    clip_time: "0:00"
+  - file: "29_233037_stukamy_sie_szampanem"
+    clip_time: "0:01"
+  - file: "29_113754_karolina_macha"
+    clip_time: "0:06"
+  - file: "28_175737_karolina_przed_bannerem"
+    clip_time: "0:04"
+  - file: "28_200543_drewutnia_karolina_siedzi"
+    clip_time: "0:00"
+  - file: "29_095735_dziewczyna_na_sciance2"
+    clip_time: "0:02"
+  - file: "29_095941_ludzien_na_sciance3_fajne_ujecie"
+    clip_time: "0:00"
+  - file: "29_103743_ludzie_klaszcza_2"
+    clip_time: "0:00"
+  - file: "28_183658_drugi_mowca_a_x2"
+    clip_time: "0:07"
+  - file: "29_104131_monika_szlachta"
+    clip_time: "0:15"
+  - file: "29_122922_drugi_mowca_na_scenie_sumienie_a"
+    clip_time: "0:02"
+  - file: "29_130535_ludzie_zbieraja_sie_na_sciance_c"
+  - file: "29_210602_wejscie_na_duza_gale"
+    clip_time: "0:00"
+  - file: "29_211355_najdalszy_stolik"
+    clip_time: "0:03"
+  - file: "29_230919_raper_sie_buja"
+    clip_time: "0:00"
+  - file: "30_000541_wjazd_na_lustro_d"
+    clip_time: "0:00"
+  - file: "30_135349_karolina_odbiera_nagrode"
+    clip_time: "0:02"
+  - file: "30_135520_ludzie_na_koncu_z_dyplomami_a"
+    clip_time: "0:00"
 
 # ANALIZA WIDEO
 video_analysis:

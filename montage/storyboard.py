@@ -5,6 +5,7 @@ Moduł eksportu i walidacji storyboardu do formatu JSON oraz czytelnego pliku TX
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from montage.openshot_exporter import OpenShotExporter
 from utils.config_loader import Config
 from utils.helpers import format_timestamp, parse_timestamp, safe_load_json, safe_save_json
 from utils.logger import console, logger
@@ -17,6 +18,8 @@ class StoryboardManager:
         self.storyboard_dir.mkdir(parents=True, exist_ok=True)
         self.json_path = self.storyboard_dir / "storyboard.json"
         self.txt_path = self.storyboard_dir / "storyboard.txt"
+        self.osp_path = self.storyboard_dir / "montage_openshot.osp"
+        self.openshot_exporter = OpenShotExporter(config)
 
     def export_storyboard(
         self,
@@ -66,7 +69,15 @@ class StoryboardManager:
 
         console.print(f"\n[bold green]Wygenerowano Storyboard:[/bold green]")
         console.print(f"  • JSON: [cyan]{self.json_path.resolve()}[/cyan]")
-        console.print(f"  • TXT:  [cyan]{self.txt_path.resolve()}[/cyan]\n")
+        console.print(f"  • TXT:  [cyan]{self.txt_path.resolve()}[/cyan]")
+
+        # 3. Zapis projektów OpenShot Video Editor (.osp: 4K oraz 480p)
+        try:
+            self.openshot_exporter.export_both_projects(storyboard_data)
+        except Exception as e:
+            logger.error(f"Błąd podczas eksportu projektów OpenShot: {e}")
+
+        console.print()
 
         return self.json_path, self.txt_path
 
