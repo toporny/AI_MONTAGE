@@ -5,6 +5,7 @@ Funkcje pomocnicze do operacji na plikach, formatowania czasu i integracji z FFm
 import json
 import os
 import re
+import shutil
 import subprocess
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -190,3 +191,70 @@ def check_ffmpeg_nvenc() -> Tuple[bool, str]:
     except Exception as e:
         logger.warning(f"Nie można sprawdzić enkoderów FFmpeg: {e}")
         return False, "libx264"
+
+
+def clean_project_artifacts(config: Any, include_exports: bool = True) -> Dict[str, Any]:
+    """
+    Czyści wszystkie pliki tymczasowe, cache i wyrenderowane pliki wideo.
+    Katalogi zostają zachowane puste, aby kolejny projekt mógł od razu działać.
+    """
+    cleaned = {
+        "analysis": 0,
+        "storyboard": 0,
+        "preview": 0,
+        "output": 0,
+        "clips": 0,
+        "logs": 0,
+        "total_bytes": 0
+    }
+
+    dirs_to_clean = [
+        ("analysis", Path(config.cache_dir)),
+        ("storyboard", Path(config.storyboard_dir)),
+        ("preview", Path(config.preview_dir)),
+        ("output", Path(config.output_dir)),
+    ]
+
+    base = Path(config.base_dir) if hasattr(config, "base_dir") else Path(".")
+
+    if include_exports:
+        dirs_to_clean.append(("clips", base / "clips_480p"))
+        dirs_to_clean.append(("clips", base / "clips_4k"))
+
+    for cat, d in dirs_to_clean:
+        if d.exists() and d.is_dir():
+            for child in list(d.iterdir()):
+                try:
+                    if child.is_file() or child.is_symlink():
+                        cleaned["total_bytes"] += child.stat().st_size
+                        child.unlink(missing_ok=True)
+                        cleaned[cat] += 1
+                    elif child.is_dir():
+                        cleaned["total_bytes"] += sum(f.stat().st_size for f in child.rglob('*') if f.is_file())
+                        shutil.rmtree(child, ignore_errors=True)
+                        cleaned[cat] += 1
+                except Exception as e:
+                    logger.warning(f"Nie udało się usunąć {child}: {e}")
+
+    # Czyść montage.log i pliki tymczasowe
+    log_file = base / "montage.log"
+    if log_file.exists():
+        try:
+            cleaned["total_bytes"] += log_file.stat().st_size
+            with open(log_file, "w", encoding="utf-8") as f:
+                f.truncate(0)
+            cleaned["logs"] += 1
+        except Exception:
+            pass
+
+    tmp_file = base / "wymuszone_ujecia_tmp.txt"
+    if tmp_file.exists():
+        try:
+            cleaned["total_bytes"] += tmp_file.stat().st_size
+            tmp_file.unlink(missing_ok=True)
+            cleaned["logs"] += 1
+        except Exception:
+            pass
+
+    return cleaned
+

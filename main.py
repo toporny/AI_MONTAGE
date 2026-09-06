@@ -34,7 +34,7 @@ def main():
     
     parser.add_argument(
         "command",
-        choices=["analyze", "analyze-music", "create-storyboard", "preview", "render", "openshot", "hardware", "all"],
+        choices=["analyze", "analyze-music", "create-storyboard", "preview", "render", "openshot", "hardware", "clean", "all"],
         help="Komenda do wykonania:\n"
              "  analyze           - Skanuje i analizuje pliki wideo proxy 480p\n"
              "  analyze-music     - Analizuje BPM, beaty i dynamikę muzyki MP3\n"
@@ -43,12 +43,14 @@ def main():
              "  render            - Renderuje finalny film 4K / 60 FPS z oryginałów\n"
              "  openshot          - Generuje plik projektu OpenShot (.osp) ze storyboardu\n"
              "  hardware          - Wyświetla audyt sprzętu (GPU i FFmpeg) oraz wskazówki\n"
+             "  clean             - Czyści pliki tymczasowe, cache i rendery, przygotowując nowy projekt\n"
              "  all               - Uruchamia wszystkie etapy po kolei"
     )
 
     parser.add_argument("--config", type=str, default=None, help="Ścieżka do pliku config.yaml")
     parser.add_argument("--music", type=str, default=None, help="Ścieżka lub nazwa pliku MP3")
     parser.add_argument("--force", action="store_true", help="Wymusza ponowne przeliczenie analizy wideo (ignoruje cache)")
+    parser.add_argument("-y", "--yes", action="store_true", help="Automatyczne potwierdzenie bez pytania (dla komendy clean)")
 
     args = parser.parse_args()
 
@@ -65,6 +67,38 @@ def main():
 
     if cmd == "hardware":
         HardwareDetector.print_startup_banner(console)
+        return
+
+    if cmd == "clean":
+        console.print("[bold yellow]================================================================================[/bold yellow]")
+        console.print("[bold yellow]         CZYSZCZENIE PLIKÓW TYMCZASOWYCH I WYNIKOWYCH PROJEKTU[/bold yellow]")
+        console.print("[bold yellow]================================================================================[/bold yellow]\n")
+        console.print("Operacja usunie zawartość folderów:")
+        console.print(f"  • Cache analizy wideo i muzyki: [cyan]{config.cache_dir}[/cyan]")
+        console.print(f"  • Storyboard i projekty OSP:    [cyan]{config.storyboard_dir}[/cyan]")
+        console.print(f"  • Pliki podglądu (preview):     [cyan]{config.preview_dir}[/cyan]")
+        console.print(f"  • Pliki wynikowe 4K (output):   [cyan]{config.output_dir}[/cyan]")
+        console.print("  • Wycięte klipy ujęć:           [cyan]clips_480p/, clips_4k/[/cyan]")
+        console.print("  • Plik logów aplikacji:         [cyan]montage.log[/cyan]\n")
+        console.print("[bold green]Twoje oryginalne materiały wideo i pliki muzyczne NIE zostaną usunięte.[/bold green]\n")
+
+        if not args.yes:
+            confirm = input("Czy na pewno chcesz wyczyścić projekt do zera? [t/N]: ")
+            if confirm.strip().lower() not in ["t", "tak", "y", "yes"]:
+                console.print("[yellow]Anulowano czyszczenie.[/yellow]")
+                return
+
+        from utils.helpers import clean_project_artifacts
+        res = clean_project_artifacts(config)
+        mb = res["total_bytes"] / (1024 * 1024)
+        console.print(f"\n[bold green]Projekt został pomyślnie wyczyszczony![/bold green]")
+        console.print(f"  • Usunięte pliki w analysis:   [bold cyan]{res['analysis']}[/bold cyan]")
+        console.print(f"  • Usunięte pliki w storyboard: [bold cyan]{res['storyboard']}[/bold cyan]")
+        console.print(f"  • Usunięte pliki w preview:    [bold cyan]{res['preview']}[/bold cyan]")
+        console.print(f"  • Usunięte pliki w output:     [bold cyan]{res['output']}[/bold cyan]")
+        console.print(f"  • Usunięte pliki w clips_*:    [bold cyan]{res['clips']}[/bold cyan]")
+        console.print(f"  • Zwolnione miejsce na dysku:  [bold cyan]{mb:.1f} MB[/bold cyan]\n")
+        console.print("[bold green]Katalogi są puste i gotowe do rozpoczęcia nowego projektu od zera![/bold green]")
         return
 
     console.print("[bold blue]================================================================================[/bold blue]")
