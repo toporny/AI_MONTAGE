@@ -3,6 +3,7 @@
 """
 
 from pathlib import Path
+import sys
 from typing import Any, Dict, List, Optional
 import yaml
 
@@ -33,17 +34,46 @@ class Config:
         # Słowo kluczowe outro wideo — klip z tym słowem w nazwie będzie ostatnim ujęciem
         self.outro_video_keyword: str = str(raw_config.get("outro_video_keyword", "")).strip()
 
-        # Lista wymuszonych ujęć: [{file: str, clip_time_sec: float|None}, ...]
+        # Lista wymuszonych ujęć: [{file: str, clip_time_start_sec: float|None, clip_time_end_sec: float|None}, ...]
         forced_raw = raw_config.get("forced_clips", []) or []
         self.forced_clips: List[Dict[str, Any]] = []
         for entry in forced_raw:
             if not isinstance(entry, dict) or "file" not in entry:
                 continue
-            raw_clip_time = entry.get("clip_time", None)
+
+            # Odczyt parametrów punktu startowego i końcowego
+            raw_start = entry.get("clip_time_start", entry.get("clip_time", None))
+            raw_end = entry.get("clip_time_end", None)
+
+            # Ścisła walidacja wzajemnego wykluczania
+            if raw_start is not None and raw_end is not None:
+                file_name = entry.get("file", "nieznany")
+                sep = "=" * 70
+                err_msg = (
+                    f"\n{sep}\n"
+                    f"  BŁĄD KRYTYCZNY KONFIGURACJI config.yaml (forced_clips):\n"
+                    f"{sep}\n"
+                    f"  Dla wymuszonego klipu '{file_name}' podano JEDNOCZEŚNIE:\n"
+                    f"    - clip_time_start: {raw_start}\n"
+                    f"    - clip_time_end:   {raw_end}\n\n"
+                    f"  Parametry te wzajemnie się wykluczają!\n"
+                    f"  Wybierz tylko jeden z nich:\n"
+                    f"    * clip_time_start - jeśli chcesz, aby ujęcie ZACZYNAŁO się od podanego momentu.\n"
+                    f"    * clip_time_end   - jeśli chcesz, aby ujęcie KOŃCZYŁO się dokładnie w podanym momencie.\n"
+                    f"{sep}\n"
+                )
+                logger.error(err_msg)
+                print(err_msg, file=sys.stderr)
+                sys.exit(1)
+
+            start_sec = self._parse_time_to_sec(raw_start)
+            end_sec = self._parse_time_to_sec(raw_end)
 
             self.forced_clips.append({
                 "file": str(entry["file"]).strip(),
-                "clip_time_sec": self._parse_time_to_sec(raw_clip_time)
+                "clip_time_start_sec": start_sec,
+                "clip_time_end_sec": end_sec,
+                "clip_time_sec": start_sec  # kompatybilność wsteczna
             })
 
         # Video Analysis

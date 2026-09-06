@@ -31,7 +31,7 @@ Do dyspozycji masz wygodne, gotowe skrypty `.bat` (uruchamiane dwuklikiem):
 ### 3. Jakie są możliwości konfiguracji (`config.yaml`)?
 Wszystkimi aspektami montażu sterujesz z poziomu przejrzystego pliku konfiguracyjnego `config.yaml`:
 * **Wybór utworu (`music_file`):** precyzyjnie wskazujesz nazwę pliku MP3 z folderu `sciezkadzwiekowa/` (wymagane ścisłe dopasowanie).
-* **Wymuszone ujęcia (`forced_clips`):** zdefiniuj klipy, które **muszą** pojawić się w filmie, opcjonalnie podając dokładny czas (np. tort urodzinowy w `1:45`).
+* **Wymuszone ujęcia (`forced_clips`):** zdefiniuj klipy, które **muszą** pojawić się w filmie, opcjonalnie podając dokładny moment rozpoczęcia (`clip_time_start`) lub zakończenia (`clip_time_end`).
 * **Wagi scoringu sztucznej inteligencji:** zdecyduj, co jest ważniejsze w doborze ujęć - obecność ludzi i twarzy, dynamika ruchu (Optical Flow), czy perfekcyjna ostrość kadru.
 * **Dynamika cięć:** ustaw minimalny czas ujęcia (domyślnie bezpieczne `1.20s`, zapobiegające efektowi stroboskopu) oraz częstotliwość cięć w zależności od energii muzyki (cięcie co 1, 2 lub 3 takty).
 * **Ścisła chronologia:** włącz/wyłącz monotoniczne prowadzenie narracji na osi czasu.
@@ -67,7 +67,7 @@ Program działa jak profesjonalny montażysta filmowy, realizując montaż w 6 e
 3. **Etap 3 & 4: Storyboard i algorytm montażysty**
    - **Dynamiczny rytm:** długość ujęcia dopasowywana do energii (od 0.35s w dropach do 6.0s w partiach spokojnych).
    - **Zasada Dropu:** najlepsze ujęcia z materiału (top 15%) są rezerwowane na kulminacje i dropy muzyczne.
-   - **Wymuszone ujęcia (`forced_clips`):** możliwość zdefiniowania klipów, które bezwzględnie muszą znaleźć się w filmie, w tym z opcją podania konkretnej chwili czasowej na osi utworu (np. przemowa w 1:30).
+   - **Wymuszone ujęcia (`forced_clips`):** możliwość zdefiniowania klipów, które bezwzględnie muszą znaleźć się w filmie, w tym z opcją precyzyjnego punktu startowego (`clip_time_start`) lub końcowego (`clip_time_end`).
    - **Różnorodność planów:** algorytm unika monotonii (kara za powtórzenie tego samego typu kadru pod rząd).
    - **Kara za powtórzenia:** zapobiega wielokrotnemu użyciu tego samego materiału źródłowego.
    - **Ścisła chronologia:** algorytm Monotonic Sliding Window zapewnia, że ujęcia układają się w czasie imprezy od pierwszego do ostatniego ujęcia (zero skoków wstecz).
@@ -87,16 +87,18 @@ Program działa jak profesjonalny montażysta filmowy, realizując montaż w 6 e
 
 ---
 
-## 🛠️ Wymagania systemowe
+## 🛠️ Wymagania systemowe & Dobór Sprzętu
 
 * **System operacyjny:** Windows 10 / Windows 11
-* **Karta graficzna:**
-  * **Zalecana:** dowolna karta NVIDIA z obsługą NVENC (seria GTX 10xx / 16xx lub RTX 20xx / 30xx / 40xx, min. 4–6 GB VRAM).
-  * **Minimalna:** dowolny komputer (karty AMD, Intel lub zintegrowana grafika) - program posiada automatyczny fallback na programowe kodowanie CPU (`libx264`/`libx265`).
+* **Karta graficzna (GPU):**
+  * **Stacja robocza (zalecana):** karta NVIDIA z obsługą CUDA i NVENC (np. seria RTX 30xx / 40xx, min. 6–8 GB VRAM, optymalnie 24 GB VRAM jak RTX 3090) – pozwala na uruchomienie flagowego modelu AI **YOLO11x** oraz błyskawiczny render NVENC 4K/60fps w kilka minut.
+  * **Laptop / Komputer biurowy:** procesory mobilne (np. AMD Ryzen 7 7730U, Intel Core) lub układy zintegrowane – w pełni wspierane przy użyciu zoptymalizowanych pod procesor modeli AI (**`yolo11n.pt`** / **`yolov8n.pt`**).
+* **Automatyczny Strażnik Sprzętu (Hardware Guard):**
+  System automatycznie bada podzespoły (GPU, VRAM, procesor CPU). W razie próby uruchomienia ciężkiego modelu Extra Large na komputerze ze zbyt małą pamięcią VRAM lub samym CPU, program natychmiast przerwie pracę z czytelnym komunikatem i wskaże dokładnie, co wpisać w `config.yaml`, zapobiegając przegrzaniu laptopa i zamrożeniu systemu.
 * **Procesor:** 4-rdzeniowy lub szybszy (Intel Core i5/i7/i9 lub AMD Ryzen).
 * **Pamięć RAM:** 16 GB (zalecane 32 GB dla płynnej obróbki materiałów 4K).
-* **Python:** 3.10+ / 3.11 / 3.12
-* **FFmpeg:** zainstalowany w systemie i dodany do zmiennej środowiskowej PATH (z opcją NVENC dla kart NVIDIA).
+* **Python:** 3.10+ / 3.11 / 3.12 (z obsługą PyTorch CUDA na maszynach z kartą NVIDIA).
+* **FFmpeg:** zainstalowany w systemie i dodany do zmiennej środowiskowej PATH (z opcją NVENC dla kart NVIDIA / AMF dla AMD).
 
 ---
 
@@ -122,28 +124,37 @@ W katalogu `AI_MONTAGE` znajduje się skrypt automatyczny:
 
 ## 🎮 Instrukcja Użycia (CLI)
 
-Możesz używać przygotowanego skryptu `run.bat`, który automatycznie aktywuje środowisko `venv`:
+Możesz używać bezpośrednich poleceń Pythona `python main.py <komenda>` (w aktywnym środowisku `venv`) lub przygotowanego skryptu `run.bat`, który automatycznie aktywuje środowisko:
 
 ### 1. Analiza klipów proxy
 ```cmd
 run.bat analyze
 ```
+*lub bezpośrednio w Pythonie:*
+```cmd
+python main.py analyze
+```
 *Program wyświetli pasek postępu z czasem pozostałym do końca (ETA). Jeśli proces zostanie przerwany, ponowne uruchomienie podejmie pracę od ostatniego nieskończonego pliku (cache JSON).*
 
 ### 2. Analiza muzyki
 ```cmd
-run.bat analyze-music
+python main.py analyze-music
 ```
 *Możesz wskazać inny plik muzyczny:*
 ```cmd
-run.bat analyze-music --music "moja_muzyka.mp3"
+python main.py analyze-music --music "moja_muzyka.mp3"
 ```
+*(lub przez `run.bat analyze-music`)*
 
-### 3. Generowanie Storyboardu
+### 3. Generowanie Storyboardu (Błyskawiczne ~2s)
+```cmd
+python main.py create-storyboard
+```
+*lub za pomocą skryptu:*
 ```cmd
 run.bat create-storyboard
 ```
-*Wygeneruje pliki:*
+*W zaledwie ~2 sekundy (bez konieczności renderowania wideo) wygeneruje lub zaktualizuje:*
 - `storyboard/storyboard.txt` *(czytelna dla człowieka lista ujęć, czasów, punktów cięcia i powodów wyboru)*
 - `storyboard/storyboard.json` *(dane dla wbudowanego silnika renderującego)*
 - `storyboard/montage_openshot_4K.osp` *(projekt OpenShot 4.0.0 podpięty pod oryginalne pliki 4K)*
@@ -287,6 +298,33 @@ W pliku `config.yaml` możesz w łatwy sposób dostosować:
 - Preferencje doboru (kary za powtórzenie typu kadru, kary za ponowne użycie pliku)
 - Jakość kodowania GPU (NVENC / AMF / QSV lub CPU)
 
+### Wybór modelu AI (`video_analysis` w config.yaml)
+
+Wybór modelu decyduje o precyzji wykrywania osób, twarzy i planów filmowych:
+
+| Model | Rozmiar | Wymagany sprzęt | Kiedy stosować |
+|---|---|---|---|
+| **`yolo11x.pt`** | Extra Large (~109 MB) | Dedykowana karta NVIDIA (CUDA, min. 4–6 GB VRAM) | **Rekomendowany dla stacji roboczych (np. RTX 3090)**. Maksymalna precyzja detekcji małych postaci w tłumie i trudnym oświetleniu. |
+| **`yolov8x.pt`** | Extra Large (~130 MB) | Dedykowana karta NVIDIA (CUDA, min. 4–6 GB VRAM) | Sprawdzony model flagowy poprzedniej generacji. |
+| **`yolo11s.pt`** | Small (~22 MB) | GPU z 2 GB VRAM lub mocny procesor CPU | Kompromis na starsze karty graficzne. |
+| **`yolo11n.pt`** | Nano (~6 MB) | Dowolny procesor CPU / zintegrowana grafika | **Rekomendowany dla laptopów (np. AMD Ryzen 7 7730U, Intel Iris)**. Szybka analiza na CPU bez przegrzewania komputera. |
+
+#### Rekomendowane ustawienia w `config.yaml`:
+* **Dla stacji roboczej z kartą NVIDIA (np. RTX 3090 24GB):**
+  ```yaml
+  video_analysis:
+    yolo_model: "yolo11x.pt"
+    device: "cuda"
+    batch_size: 32
+  ```
+* **Dla laptopa lub komputera bez dedykowanego GPU (np. Ryzen 7 7730U):**
+  ```yaml
+  video_analysis:
+    yolo_model: "yolo11n.pt"
+    device: "cpu"
+    batch_size: 4
+  ```
+
 ---
 
 ## 📂 Struktura katalogów projektu
@@ -359,8 +397,9 @@ run.bat sync-proxies
 :: 2. Przeanalizuj klipy proxy (pomija już przeanalizowane - cache)
 run.bat analyze
 
-:: 3. Wygeneruj storyboard (ścisła chronologia, zsynchronizowany z muzyką)
-run.bat create-storyboard
+:: 3. Wygeneruj storyboard (~2s, tworzy też projekty OpenShot .osp)
+python main.py create-storyboard
+:: lub: run.bat create-storyboard
 
 :: 4. Sprawdź szybki podgląd (~28s render, ~10MB)
 run.bat preview
@@ -375,8 +414,8 @@ run.bat export-clips --only-proxy
 > **Zmiana muzyki:**
 
 ```cmd
-:: Wystarczy wygenerować nowy storyboard i render - analiza wideo jest w cache
-run.bat create-storyboard
+:: Wystarczy wygenerować nowy storyboard (~2s) i render - analiza wideo jest w cache
+python main.py create-storyboard
 run.bat preview
 run.bat render
 ```
@@ -415,12 +454,12 @@ Program wybierze z nich najlepszy fragment (ostrość, osoby, ruch) i przytnie d
 ```yaml
 forced_clips:
   - file: "29_125240_piata_mowczyni_na_scenie_b"
-    clip_time: "0:03"           # zacznij wycinać od 3. sekundy tego klipu (pomiń początek)
+    clip_time_start: "0:03"     # zacznij wycinać od 3. sekundy tego klipu (pomiń początek)
 
   - file: "29_130535_ludzie_zbieraja_sie_na_sciance_c"
 
   - file: "28_193407_kolacja_wieczorna"
-    clip_time: "0:15"           # punkt startowy: 15. sekunda nagrania
+    clip_time_end: "0:12"       # ujęcie w montażu skończy się dokładnie w 12. sekundzie
 ```
 
 > [!IMPORTANT]
@@ -441,13 +480,27 @@ forced_clips:
 | Parametr | Wymagany? | Opis |
 |----------|-----------|------|
 | `file` | **TAK** | Dokładna nazwa pliku z `kopie_robocze_480p/` — bez `_480p15` i bez `.mp4`. Możesz też wpisać z sufiksem — program sam go odtnie. |
-| `clip_time` | Opcjonalny | Punkt startowy wewnątrz Twojego nagrania (np. `"0:03"` lub `"15"`). Pomija wszystko co przed nim! Algorytm sam dobierze odpowiednią długość trwania sceny w rytm muzyki. |
+| `clip_time_start` | Opcjonalny | Punkt startowy wewnątrz nagrania (np. `"0:03"` lub `"15"`). Pomija wszystko co przed nim! Algorytm sam dobierze odpowiednią długość trwania sceny w rytm muzyki. |
+| `clip_time_end` | Opcjonalny | Punkt końcowy wewnątrz nagrania (np. `"0:10"`). Algorytm dobiera początek wstecz w rytm muzyki, tak aby ujęcie w filmie docelowym skończyło się dokładnie w tej sekundzie. |
 
-* **Gdy podasz tylko `file` (bez `clip_time`):**
+> [!WARNING]
+> **Wzajemne wykluczanie:** Parametry `clip_time_start` oraz `clip_time_end` **nie mogą** występować jednocześnie dla tego samego klipu. Podanie obu spowoduje przerwanie działania z błędem wyjaśniającym.
+
+* **Gdy podasz tylko `file` (bez `clip_time_start` ani `clip_time_end`):**
   * Ujęcie trafi na oś czasu **automatycznie i chronologicznie** (zgodnie z datą/godziną nagrania).
   * Algorytm AI **samodzielnie przeskanuje klip i wybierze z niego najlepszy moment** (najwyższy score: ostrość, twarze, stabilność).
 * **Długość wycinka:** Zawsze dobierana jest automatycznie w rytm muzyki (~1.2–6s zależnie od energii) — nie musisz ręcznie wyliczać klatki końcowej!
 * **Kolizje czasowe:** Jeśli dwa wymuszone ujęcia trafią na ten sam slot, drugie zostanie przesunięte do najbliższego wolnego miejsca na osi czasu.
 
-> [!NOTE]
-> Po zmianie `forced_clips` wystarczy uruchomić `ZROB_PREVIEW.bat` (nie trzeba ponownie analizować klipów - analiza jest w cache).
+> [!TIP]
+> **Jak przetestować zmiany po edycji `forced_clips`?**
+> - **Opcja 1 (Błyskawiczna ~2 sekundy - Storyboard & OpenShot):**
+>   ```cmd
+>   python main.py create-storyboard
+>   ```
+>   *(lub `run.bat create-storyboard`)*
+>   Przelicza wyłącznie dopasowanie klipów na osi czasu i natychmiast aktualizuje `storyboard/storyboard.json`, `storyboard/storyboard.txt` oraz oba projekty OpenShot (`montage_openshot_4K.osp` i `montage_openshot_480p.osp`) bez konieczności czekania na renderowanie wideo.
+> - **Opcja 2 (Wyrenderowanie podglądu MP4 ~25–30 sekund):**
+>   Uruchom dwuklikiem `ZROB_PREVIEW.bat` (lub `python main.py preview` / `run.bat preview`). Wygeneruje zaktualizowany storyboard i od razu wyrenderuje plik wideo `preview/preview_montage_480p.mp4`.
+>
+> *(W obu przypadkach nie trzeba ponownie analizować klipów – cała analiza AI wideo jest bezpiecznie zachowana w cache).*

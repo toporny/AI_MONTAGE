@@ -63,18 +63,22 @@ class MontageSelector:
                 continue
 
             matched_v = video_by_stem[norm_pattern]
-            clip_time_sec = fc.get("clip_time_sec")
+            clip_time_start_sec = fc.get("clip_time_start_sec", fc.get("clip_time_sec"))
+            clip_time_end_sec = fc.get("clip_time_end_sec")
 
             time_info_parts = ["auto-chronologia"]
-            if clip_time_sec is not None:
-                time_info_parts.append(f"od klatki: {int(clip_time_sec//60)}:{int(clip_time_sec%60):02d}")
+            if clip_time_start_sec is not None:
+                time_info_parts.append(f"od klatki: {int(clip_time_start_sec//60)}:{int(clip_time_start_sec%60):02d}")
+            elif clip_time_end_sec is not None:
+                time_info_parts.append(f"do klatki: {int(clip_time_end_sec//60)}:{int(clip_time_end_sec%60):02d}")
 
             time_info = " (" + ", ".join(time_info_parts) + ")"
             logger.info(f"Wymuszone ujęcie: '{raw_name}'{time_info} → {matched_v.get('file_name')}")
 
             result.append({
                 "video": matched_v,
-                "clip_time_sec": clip_time_sec,
+                "clip_time_start_sec": clip_time_start_sec,
+                "clip_time_end_sec": clip_time_end_sec,
                 "pattern": raw_name
             })
 
@@ -201,12 +205,13 @@ class MontageSelector:
         num_vids = len(sorted_videos)
 
         forced_clips_list = self._find_forced_clips(sorted_videos, timeline_slots)
-        # s_idx -> (best_forced_cand, pattern, clip_time_sec)
-        forced_slot_reservations: Dict[int, Tuple[Dict[str, Any], str, Optional[float]]] = {}
+        # s_idx -> (best_forced_cand, pattern, clip_time_start_sec, clip_time_end_sec)
+        forced_slot_reservations: Dict[int, Tuple[Dict[str, Any], str, Optional[float], Optional[float]]] = {}
 
         for fc in forced_clips_list:
             matched_v = fc["video"]
-            clip_time_sec = fc.get("clip_time_sec")
+            clip_time_start_sec = fc.get("clip_time_start_sec")
+            clip_time_end_sec = fc.get("clip_time_end_sec")
             pattern = fc["pattern"]
 
             # Wyznacz docelowy slot chronologicznie
@@ -214,17 +219,23 @@ class MontageSelector:
             target_s_idx = int(file_idx * (num_main_slots - 1) / max(1, num_vids - 1))
             target_s_idx = max(0, min(num_main_slots - 1, target_s_idx))
 
-            # Najlepszy highlight z tego klipu (lub dopasowany do clip_time)
+            # Najlepszy highlight z tego klipu (lub dopasowany do clip_time_start / clip_time_end)
             forced_cands = [c for c in all_candidates if c["clip_meta"]["file_idx"] == matched_v["file_idx"]]
             if not forced_cands:
                 logger.warning(f"Wymuszone ujęcie '{pattern}' — brak danych w analizie (uruchom ponownie 'analyze')")
                 continue
 
-            if clip_time_sec is not None:
-                # Szukaj highlightu najbliższego żądanej chwili czasowej w klipie
+            if clip_time_start_sec is not None:
+                # Szukaj highlightu najbliższego żądanej chwili startu w klipie
                 best_forced_cand = min(
                     forced_cands,
-                    key=lambda x: abs(x["highlight"]["start_sec"] - clip_time_sec)
+                    key=lambda x: abs(x["highlight"]["start_sec"] - clip_time_start_sec)
+                )
+            elif clip_time_end_sec is not None:
+                # Szukaj highlightu najbliższego żądanej chwili końca w klipie
+                best_forced_cand = min(
+                    forced_cands,
+                    key=lambda x: abs((x["highlight"]["start_sec"] + x["highlight"]["duration"]) - clip_time_end_sec)
                 )
             else:
                 best_forced_cand = max(forced_cands, key=lambda x: x["highlight"]["score"])
@@ -237,19 +248,23 @@ class MontageSelector:
                     reserved_slot = candidate_slot
                     break
 
-            forced_slot_reservations[reserved_slot] = (best_forced_cand, pattern, clip_time_sec)
+            forced_slot_reservations[reserved_slot] = (best_forced_cand, pattern, clip_time_start_sec, clip_time_end_sec)
             slot_time = timeline_slots[reserved_slot]["start_sec"]
             desc_parts = [f"slot={slot_time:.1f}s"]
-            if clip_time_sec is not None:
-                desc_parts.append(f"od_klatki={clip_time_sec:.1f}s")
+            if clip_time_start_sec is not None:
+                desc_parts.append(f"od_klatki={clip_time_start_sec:.1f}s")
+            elif clip_time_end_sec is not None:
+                desc_parts.append(f"do_klatki={clip_time_end_sec:.1f}s")
             logger.info(f"  → slot {reserved_slot} ({', '.join(desc_parts)})")
 
         # Wypełnij zarezerwowane sloty wymuszonymi ujęciami
-        for s_idx, (forced_cand, pattern, clip_time_sec) in forced_slot_reservations.items():
+        for s_idx, (forced_cand, pattern, clip_time_start_sec, clip_time_end_sec) in forced_slot_reservations.items():
             slot = timeline_slots[s_idx]
             reason_parts = [f"forced:{pattern}"]
-            if clip_time_sec is not None:
-                reason_parts.append(f"clip@{clip_time_sec:.0f}s")
+            if clip_time_start_sec is not None:
+                reason_parts.append(f"clip_start@{clip_time_start_sec:.0f}s")
+            elif clip_time_end_sec is not None:
+                reason_parts.append(f"clip_end@{clip_time_end_sec:.0f}s")
             reason = " ".join(reason_parts)
 
             cut = self._create_cut_entry(
@@ -257,7 +272,8 @@ class MontageSelector:
                 cand=forced_cand,
                 match_score=forced_cand["highlight"]["score"] + 50.0,
                 reason=reason,
-                clip_start_override=clip_time_sec
+                clip_start_override=clip_time_start_sec,
+                clip_end_override=clip_time_end_sec
             )
             assigned_cuts[s_idx] = cut
             key = f"{forced_cand['source_file']}_{cut['source_start']}"
@@ -378,7 +394,8 @@ class MontageSelector:
         cand: Dict[str, Any],
         match_score: float,
         reason: str,
-        clip_start_override: Optional[float] = None
+        clip_start_override: Optional[float] = None,
+        clip_end_override: Optional[float] = None
     ) -> Dict[str, Any]:
         """Tworzy ustrukturyzowany rekord ujęcia na osi czasu."""
         slot_duration = slot["duration"]
@@ -388,12 +405,19 @@ class MontageSelector:
         src_total_dur = cand["source_duration"]
 
         if clip_start_override is not None:
-            # Użytkownik podał konkretną chwilę czasową wewnątrz klipu
+            # Użytkownik podał konkretną chwilę startu wewnątrz klipu
             src_start = max(0.0, min(src_total_dur, float(clip_start_override)))
             src_end = min(src_total_dur, src_start + slot_duration)
             # Jeśli klip jest za krótki od tego miejsca do końca, cofnij początek na ile to możliwe
             if (src_end - src_start) < slot_duration and src_start > 0.0:
                 src_start = max(0.0, src_end - slot_duration)
+        elif clip_end_override is not None:
+            # Użytkownik zażądał, by ujęcie kończyło się dokładnie w podanym momencie wideo źródłowego
+            src_end = max(0.0, min(src_total_dur, float(clip_end_override)))
+            src_start = max(0.0, src_end - slot_duration)
+            # Jeśli od początku nagrania do src_end jest mniej niż slot_duration, wydłuż src_end w prawo
+            if (src_end - src_start) < slot_duration:
+                src_end = min(src_total_dur, src_start + slot_duration)
         elif h_dur >= slot_duration:
             src_start = h_start
             src_end = min(src_total_dur, h_start + slot_duration)

@@ -3,6 +3,7 @@ Moduł detekcji osób i twarzy przy użyciu YOLO (ultralytics) z klasyfikacją p
 """
 
 from pathlib import Path
+import sys
 from typing import Any, Dict, List, Optional, Tuple
 import cv2
 import numpy as np
@@ -20,14 +21,27 @@ except ImportError:
 class PeopleDetector:
     def __init__(self, model_name: str = "yolov8n.pt", device: str = "cuda"):
         self.model_name = model_name
-        self.device = device if (torch.cuda.is_available() and device == "cuda") else "cpu"
+        self.requested_device = device
+        self.device = device if (ULTRALYTICS_AVAILABLE and torch.cuda.is_available() and device == "cuda") else "cpu"
         self.model = None
-        self._init_model()
+
+    def ensure_model_loaded(self):
+        """Upewnia się, że model jest załadowany i sprzęt jest zweryfikowany."""
+        if self.model is None:
+            self._init_model()
 
     def _init_model(self):
         if not ULTRALYTICS_AVAILABLE:
             logger.warning("Pakiet ultralytics nie jest zainstalowany. Detekcja osób będzie wyłączona.")
             return
+
+        # Walidacja kompatybilności sprzętowej z wybranym rozmiarem modelu
+        from utils.hardware import HardwareDetector
+        ok, err_msg = HardwareDetector.validate_yolo_model_compatibility(self.model_name, self.device)
+        if not ok and err_msg:
+            print(err_msg, file=sys.stderr)
+            logger.error(err_msg)
+            sys.exit(1)
 
         try:
             logger.info(f"Ładowanie modelu YOLO ({self.model_name}) na urządzenie: {self.device}")
@@ -46,6 +60,9 @@ class PeopleDetector:
         """
         if not frames:
             return []
+
+        if self.model is None:
+            self.ensure_model_loaded()
 
         if self.model is None:
             # Fallback dla braku modelu YOLO

@@ -174,7 +174,7 @@ class FinalRenderer:
             console.print(f"  • Plik wynikowy: [bold yellow]{self.output_file.resolve()}[/bold yellow]")
             console.print(f"  • Rozmiar pliku: [bold cyan]{file_size_mb:.2f} MB[/bold cyan]")
             console.print(f"  • Czas renderowania: [bold cyan]{elapsed:.1f} s[/bold cyan] ({elapsed/60:.1f} min)")
-            console.print(f"  • Użyty kodek: [bold green]{chosen_codec}[/bold green] (NVIDIA NVENC)")
+            console.print(f"  • Użyty kodek: [bold green]{enc_cfg.codec}[/bold green] ({enc_cfg.description})")
             console.print(f"  • Oryginalne audio: [bold red]USUNIĘTE[/bold red]")
             console.print(f"  • Muzyka: [bold green]{music_file.name}[/bold green] (AAC 320 kbps)")
             console.print(f"[bold green]================================================================================[/bold green]\n")

@@ -214,6 +214,152 @@ class HardwareDetector:
         return gpus[0]
 
     @classmethod
+    def get_cpu_name(cls) -> str:
+        """Zwraca dokładną nazwę procesora CPU (np. AMD Ryzen 7 7730U lub Intel Core i7-8700)."""
+        import platform
+        import sys
+        if sys.platform == "win32":
+            try:
+                res = subprocess.run(
+                    ["powershell", "-NoProfile", "-Command", "(Get-CimInstance Win32_Processor).Name"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    timeout=3
+                )
+                if res.returncode == 0 and res.stdout.strip():
+                    return res.stdout.strip().splitlines()[0].strip()
+            except Exception:
+                pass
+        return platform.processor() or "Standard CPU"
+
+    @classmethod
+    def get_model_info(cls, model_name: str) -> Tuple[str, str, str, float]:
+        """
+        Rozpoznaje klasę wielkości modelu YOLO na podstawie nazwy pliku.
+        Zwraca: (tier_code, tier_friendly_name, approx_params, min_vram_gb)
+        """
+        stem = Path(model_name).stem.lower()
+        if stem.endswith("x") or stem.endswith("e"):
+            return "xlarge", "Extra Large (flagowy)", "~57-68M parametrów", 4.0
+        elif stem.endswith("l"):
+            return "large", "Large (duży)", "~43M parametrów", 3.0
+        elif stem.endswith("m") or stem.endswith("c"):
+            return "medium", "Medium (średni)", "~26M parametrów", 2.0
+        elif stem.endswith("s"):
+            return "small", "Small (mały)", "~11M parametrów", 1.0
+        elif stem.endswith("n"):
+            return "nano", "Nano (lekki / mobilny)", "~3M parametrów", 0.5
+        return "nano", "Standard (nieznany)", "~3M parametrów", 0.5
+
+    @classmethod
+    def validate_yolo_model_compatibility(
+        cls,
+        model_name: str,
+        requested_device: str = "cuda"
+    ) -> Tuple[bool, Optional[str]]:
+        """
+        Waliduje, czy dostępny sprzęt (GPU/VRAM/CPU) jest w stanie pomieścić i wydajnie
+        uruchomić wybrany model YOLO.
+        
+        Jeśli model jest zbyt ciężki (np. xlarge, large) dla wykrytego sprzętu:
+        - identyfikuje wykryte karty w systemie (np. AMD Radeon, Intel Iris) lub procesor CPU,
+        - zwraca (False, sformatowany_komunikat) z dokładną instrukcją konfiguracji.
+        """
+        tier_code, tier_name, params_str, min_vram = cls.get_model_info(model_name)
+
+        # Modele lekkie (Nano, Small) są dopuszczalne na każdym sprzęcie (również CPU)
+        if tier_code in ["nano", "small"]:
+            return True, None
+
+        # Sprawdź dostępność akceleracji CUDA w PyTorch
+        has_cuda = False
+        cuda_vram_gb = 0.0
+        cuda_gpu_name = ""
+        try:
+            import torch
+            has_cuda = torch.cuda.is_available()
+            if has_cuda:
+                cuda_gpu_name = torch.cuda.get_device_name(0)
+                cuda_vram_gb = round(torch.cuda.get_device_properties(0).total_memory / (1024 ** 3), 1)
+        except Exception:
+            has_cuda = False
+
+        # Przypadek 1: Dedykowana karta NVIDIA z CUDA i odpowiednią ilością VRAM
+        if has_cuda and cuda_vram_gb >= min_vram:
+            return True, None
+
+        # Przypadek 2: Karta NVIDIA wykryta, ale ma zbyt mało VRAM na ten model
+        if has_cuda and cuda_vram_gb < min_vram:
+            sep = "=" * 70
+            err_msg = (
+                f"\n{sep}\n"
+                f"  BŁĄD SPRZĘTOWY - ZA MAŁO PAMIĘCI VRAM DLA MODELU '{model_name}'!\n"
+                f"{sep}\n"
+                f"  Wybrany model:        '{model_name}' ({tier_name}, {params_str})\n"
+                f"  Wymagany VRAM:        min. {min_vram:.1f} GB VRAM\n"
+                f"  Wykryta karta GPU:    {cuda_gpu_name} ({cuda_vram_gb:.1f} GB VRAM)\n\n"
+                f"  Karta graficzna posiada zbyt mało pamięci VRAM, aby pomieścić ten model.\n"
+                f"  Próba uruchomienia grozi natychmiastowym błędem Out of Memory (CUDA OOM).\n\n"
+                f"  CO NALEŻY ZROBIĆ:\n"
+                f"  Otwórz plik 'config.yaml' i w sekcji 'video_analysis' zmień model na lżejszy:\n\n"
+                f"  video_analysis:\n"
+                f"    yolo_model: \"yolo11s.pt\"   # lub \"yolo11n.pt\"\n"
+                f"    device: \"cuda\"\n"
+                f"    batch_size: 8             # dopasowana wielkość paczki\n"
+                f"{sep}\n"
+            )
+            return False, err_msg
+
+        # Przypadek 3: Brak karty z obsługą CUDA (np. tylko CPU lub zintegrowana grafika AMD/Intel)
+        detected_gpus = cls.detect_gpus()
+        cpu_name = cls.get_cpu_name()
+
+        gpu_descriptions = []
+        for g in detected_gpus:
+            if g.vendor != "cpu":
+                vram_info = f", {g.vram_gb:.1f} GB VRAM" if g.vram_gb else ""
+                gpu_descriptions.append(f"{g.name} ({g.vendor.upper()}{vram_info})")
+
+        if gpu_descriptions:
+            gpu_summary = ", ".join(gpu_descriptions)
+            gpu_note = (
+                f"  * Wykryta karta GPU:  {gpu_summary}\n"
+                f"    (Karta nie obsługuje środowiska NVIDIA CUDA w PyTorch dla Windows)\n"
+            )
+        else:
+            gpu_note = "  * Karta graficzna:    Brak dedykowanej karty graficznej GPU (tylko CPU)\n"
+
+        sep = "=" * 70
+        err_msg = (
+            f"\n{sep}\n"
+            f"  BŁĄD SPRZĘTOWY - MODEL AI JEST ZBYT WYMAGAJĄCY DLA TEGO KOMPUTERA!\n"
+            f"{sep}\n"
+            f"  Wybrany model:        '{model_name}' ({tier_name}, {params_str})\n\n"
+            f"  Wykryty sprzęt w tym komputerze:\n"
+            f"{gpu_note}"
+            f"  * Procesor CPU:       {cpu_name}\n\n"
+            f"  DLACZEGO PROGRAM PRZERWAŁ DZIAŁANIE:\n"
+            f"  Model '{model_name}' to bardzo wymagająca sieć neuronowa przeznaczona\n"
+            f"  do uruchamiania na dedykowanych kartach graficznych NVIDIA (min. {min_vram:.1f} GB VRAM).\n"
+            f"  Na tym komputerze brak akceleracji CUDA dla tak dużego modelu.\n"
+            f"  Próba uruchomienia go na procesorze CPU lub zintegrowanej grafice spowodowałaby\n"
+            f"  drastyczny spadek wydajności (nawet 1-3 sekundy na 1 klatkę wideo, co dla całego\n"
+            f"  materiału oznacza wiele godzin pracy) oraz silne nagrzewanie procesora.\n\n"
+            f"  CO NALEŻY ZROBIĆ:\n"
+            f"  Otwórz plik 'config.yaml' i w sekcji 'video_analysis' zamień model na wersję lekką:\n\n"
+            f"  video_analysis:\n"
+            f"    yolo_model: \"yolo11n.pt\"   # lub \"yolov8n.pt\" (zoptymalizowany pod procesor CPU)\n"
+            f"    device: \"cpu\"\n"
+            f"    batch_size: 4             # optymalna paczka dla procesora bez dedykowanego GPU\n\n"
+            f"  Wskazówka: Model 'yolo11n.pt' (Nano) policzy się na Twoim procesorze\n"
+            f"  błyskawicznie, zużywając ułamek pamięci RAM i nie przegrzewając komputera!\n"
+            f"{sep}\n"
+        )
+        return False, err_msg
+
+
+    @classmethod
     def audit_ffmpeg(cls, force_refresh: bool = False) -> FFmpegCapabilities:
         """
         Bada zainstalowany plik binarny FFmpeg i sprawdza wkompilowane enkodery wideo.

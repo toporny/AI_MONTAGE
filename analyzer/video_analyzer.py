@@ -110,7 +110,8 @@ class VideoAnalyzer:
                         progress.advance(task_id)
                         continue
 
-                # 2. Wykonaj pełną analizę pliku
+                # 2. Wykonaj pełną analizę pliku (weryfikuje sprzęt przy pierwszym ujęciu)
+                self.people_detector.ensure_model_loaded()
                 try:
                     analysis_result = self.analyze_single_video(video_path)
                     if analysis_result:

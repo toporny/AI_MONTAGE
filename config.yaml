@@ -57,72 +57,80 @@ outro_video_keyword: ""
 #
 # Każda pozycja na liście:
 #   file: (wymagane) dokładna nazwa pliku (patrz wyżej)
-#   clip_time:  (opcjonalne) punkt startowy wewnątrz Twojego nagrania (od kiedy wycinać)
-#               Formaty: "0:03" = od 3. sekundy | "15" = od 15. sekundy nagrania
-#               Wszystko przed tą chwilą zostanie pominięte!
-#               Długość wycinka dobierze algorytm w rytm muzyki.
-#               Pozycja ujęcia na osi utworu jest dobierana automatycznie chronologicznie.
+#   clip_time_start: (opcjonalne) punkt startowy wewnątrz nagrania źródłowego (od kiedy wycinać)
+#                    Formaty: "0:03" = od 3. sekundy | "15" = od 15. sekundy nagrania
+#                    Wszystko przed tą chwilą zostanie pominięte!
+#   clip_time_end:   (opcjonalne) punkt końcowy wewnątrz nagrania źródłowego (kiedy ujęcie ma się skończyć)
+#                    Formaty: "0:10" = ujęcie skończy się dokładnie w 10. sekundzie nagrania źródłowego
+#                    Algorytm dobierze początek wstecz w rytm muzyki.
+#
+#   WAŻNE: clip_time_start i clip_time_end NIE MOGĄ występować naraz dla tego samego ujęcia!
+#          Jeśli oba zostaną podane, program przerwie działanie z błędem wyjaśniającym.
 #
 # Przykłady:
 #   forced_clips:
 #     - file: "29_125240_piata_mowczyni_na_scenie_b"
-#       clip_time: "0:03"           # zacznij wycinać od 3. sekundy tego klipu
+#       clip_time_start: "0:03"     # zacznij wycinać od 3. sekundy tego klipu
 #     - file: "29_130535_ludzie_zbieraja_sie_na_sciance_c"
 #     - file: "28_193407_kolacja_wieczorna"
-#       clip_time: "0:12"           # od 12. sekundy wideo
+#       clip_time_end: "0:12"       # ujęcie ma zakończyć się dokładnie w 12. sekundzie
 # ==============================================================================
 forced_clips:
   - file: "29_125240_piata_mowczyni_na_scenie_b"
-    clip_time: "0:03"
+    clip_time_start: "0:03"
   - file: "29_235041_magda_geba_i"
-    clip_time: "0:00"
+    clip_time_start: "0:00"
   - file: "29_233037_stukamy_sie_szampanem"
-    clip_time: "0:01"
+    clip_time_start: "0:01"
   - file: "29_113754_karolina_macha"
-    clip_time: "0:06"
+    clip_time_start: "0:06"
   - file: "28_175737_karolina_przed_bannerem"
-    clip_time: "0:04"
+    clip_time_start: "0:04"
   - file: "28_200543_drewutnia_karolina_siedzi"
-    clip_time: "0:00"
+    clip_time_start: "0:00"
+  - file: "29_095735_dziewczyna_na_sciance"
+    clip_time_end: "0:18"
   - file: "29_095735_dziewczyna_na_sciance2"
-    clip_time: "0:02"
+    clip_time_start: "0:00"
   - file: "29_095941_ludzien_na_sciance3_fajne_ujecie"
-    clip_time: "0:00"
+    clip_time_end: "0:17"
   - file: "29_103743_ludzie_klaszcza_2"
-    clip_time: "0:00"
+    clip_time_start: "0:00"
   - file: "28_183658_drugi_mowca_a_x2"
-    clip_time: "0:07"
+    clip_time_start: "0:07"
   - file: "29_104131_monika_szlachta"
-    clip_time: "0:15"
+    clip_time_start: "0:15"
   - file: "29_122922_drugi_mowca_na_scenie_sumienie_a"
-    clip_time: "0:02"
+    clip_time_start: "0:02"
   - file: "29_130535_ludzie_zbieraja_sie_na_sciance_c"
   - file: "29_210602_wejscie_na_duza_gale"
-    clip_time: "0:00"
+    clip_time_start: "0:00"
   - file: "29_211355_najdalszy_stolik"
-    clip_time: "0:03"
+    clip_time_start: "0:03"
+  - file: "29_235041_magda_geba_i.mp4"
+    clip_time_start: "0:00"
   - file: "29_230919_raper_sie_buja"
-    clip_time: "0:00"
+    clip_time_start: "0:00"
   - file: "30_000541_wjazd_na_lustro_d"
-    clip_time: "0:00"
+    clip_time_start: "0:01"
   - file: "30_135349_karolina_odbiera_nagrode"
-    clip_time: "0:02"
+    clip_time_start: "0:02"
   - file: "30_135520_ludzie_na_koncu_z_dyplomami_a"
-    clip_time: "0:00"
+    clip_time_start: "0:00"
 
 # ANALIZA WIDEO
 video_analysis:
-  # Częstotliwość próbkowania klatek do analizy (w sekundach, np. 0.2s = 5 klatek na sekundę dla proxy 15fps)
-  sample_interval_sec: 0.2
+  # Częstotliwość próbkowania klatek do analizy (w sekundach, np. 0.5s = 2 klatki na sekundę)
+  sample_interval_sec: 0.5
 
-  # Model detekcji obiektów/ludzi (yolov8n.pt, yolov8s.pt, yolov8m.pt, yolo11n.pt)
-  yolo_model: "yolov8n.pt"
+  # Model detekcji obiektów/ludzi (yolo11n.pt - lekki, błyskawiczny i precyzyjny model Nano)
+  yolo_model: "yolo11n.pt"
 
   # Urządzenie obliczeniowe ('cuda' dla GPU NVIDIA lub 'cpu')
   device: "cuda"
 
-  # Batch size dla inferencji AI
-  batch_size: 16
+  # Batch size dla inferencji AI (dla GPU: 32)
+  batch_size: 32
 
   # Długości okien czasowych do wyszukiwania highlightów wewnątrz scen (w sekundach)
   highlight_window_sizes: [1.0, 1.5, 2.0, 3.0, 4.0]

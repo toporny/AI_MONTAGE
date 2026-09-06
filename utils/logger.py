@@ -8,6 +8,13 @@ from pathlib import Path
 from rich.console import Console
 from rich.logging import RichHandler
 
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 console = Console()
 
 def setup_logger(log_file: str = "montage.log", level: int = logging.INFO) -> logging.Logger:
