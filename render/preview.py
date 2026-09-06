@@ -8,6 +8,7 @@ import time
 from typing import Any, Dict, List, Optional
 
 from utils.config_loader import Config
+from utils.hardware import HardwareDetector
 from utils.helpers import check_ffmpeg_nvenc, format_timestamp, run_command, safe_load_json
 from utils.logger import console, logger
 
@@ -49,12 +50,19 @@ class PreviewRenderer:
         temp_segments_dir = self.preview_dir / "temp_segments"
         temp_segments_dir.mkdir(parents=True, exist_ok=True)
 
-        has_nvenc, nvenc_encoder = check_ffmpeg_nvenc()
-        v_encoder = "h264_nvenc" if has_nvenc else "libx264"
         prev_cfg = getattr(self.config, "rendering_preview", {}) or {}
-        cq = str(prev_cfg.get("cq", "34"))
-        preset = prev_cfg.get("preset", "p1")
+        req_codec = prev_cfg.get("codec", "auto")
+        cq_val = int(prev_cfg.get("cq", 34)) if "cq" in prev_cfg else 34
+        preset_val = prev_cfg.get("preset", None)
         a_bitrate = prev_cfg.get("audio_bitrate", "128k")
+
+        enc_cfg = HardwareDetector.get_encoder_config(
+            target_mode="preview",
+            requested_codec=req_codec,
+            cq=cq_val,
+            preset=preset_val
+        )
+        logger.info(f"Używam enkodera podglądu: {enc_cfg.description}")
 
         # Dla uniknięcia problemów z różnymi timebase w proxy, wycinamy krótkie fragmenty
         segment_files = []
@@ -76,9 +84,7 @@ class PreviewRenderer:
                         "-t", str(s_dur),
                         "-vf", "scale=854:480:force_original_aspect_ratio=decrease,pad=854:480:(ow-iw)/2:(oh-ih)/2",
                         "-r", "15",
-                        "-c:v", v_encoder,
-                        "-preset", preset if has_nvenc else "ultrafast",
-                        "-cq", cq,
+                        *enc_cfg.args,
                         "-pix_fmt", "yuv420p",
                         "-an",
                         str(seg_out)
@@ -111,9 +117,7 @@ class PreviewRenderer:
                     "-ss", str(s_start),
                     "-i", str(proxy_p),
                     "-t", str(s_dur),
-                    "-c:v", v_encoder,
-                    "-preset", preset if has_nvenc else "ultrafast",
-                    "-cq", cq,
+                    *enc_cfg.args,
                     "-an",
                     str(seg_out)
                 ]

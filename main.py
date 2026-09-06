@@ -22,18 +22,19 @@ from music.music_analyzer import MusicAnalyzer
 from render.final_render import FinalRenderer
 from render.preview import PreviewRenderer
 from utils.config_loader import load_config
+from utils.hardware import HardwareDetector
 from utils.logger import console, logger
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="AI Automatic Music Montage System (RTX 3090 / NVENC)",
+        description="AI Automatic Music Montage System (Universal Hardware / NVENC / AMF / QSV / CPU)",
         formatter_class=argparse.RawTextHelpFormatter
     )
     
     parser.add_argument(
         "command",
-        choices=["analyze", "analyze-music", "create-storyboard", "preview", "render", "openshot", "all"],
+        choices=["analyze", "analyze-music", "create-storyboard", "preview", "render", "openshot", "hardware", "all"],
         help="Komenda do wykonania:\n"
              "  analyze           - Skanuje i analizuje pliki wideo proxy 480p\n"
              "  analyze-music     - Analizuje BPM, beaty i dynamikę muzyki MP3\n"
@@ -41,6 +42,7 @@ def main():
              "  preview           - Renderuje szybki podgląd 480p z proxy\n"
              "  render            - Renderuje finalny film 4K / 60 FPS z oryginałów\n"
              "  openshot          - Generuje plik projektu OpenShot (.osp) ze storyboardu\n"
+             "  hardware          - Wyświetla audyt sprzętu (GPU i FFmpeg) oraz wskazówki\n"
              "  all               - Uruchamia wszystkie etapy po kolei"
     )
 
@@ -61,9 +63,16 @@ def main():
 
     cmd = args.command
 
+    if cmd == "hardware":
+        HardwareDetector.print_startup_banner(console)
+        return
+
     console.print("[bold blue]================================================================================[/bold blue]")
     console.print("[bold cyan]       INTELIGENTNY SYSTEM AUTOMATYCZNEGO MONTAŻU AI (AI MONTAGE)[/bold cyan]")
     console.print("[bold blue]================================================================================[/bold blue]\n")
+
+    if cmd in ["preview", "render", "all"]:
+        HardwareDetector.print_startup_banner(console)
 
     # Inicjalizacja modułów
     video_analyzer = VideoAnalyzer(config)

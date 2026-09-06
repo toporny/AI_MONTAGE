@@ -222,25 +222,25 @@ montage_rules:
     # Maksymalna dopuszczalna liczba użyć jednego pliku źródłowego w całym filmie (1 = każde ujęcie unikalne)
     max_source_clip_uses: 1
 
-# USTAWIENIA RENDERERA
+# USTAWIENIA RENDERERA (Uniwersalne GPU & CPU)
 rendering:
   # Szybki podgląd roboczy (Preview Draft - niska jakość, błyskawiczny rendering)
   preview:
     resolution: [640, 360]    # 360p / draft
     fps: 15
-    codec: "h264_nvenc"       # Akceleracja GPU NVENC (lub "libx264" dla CPU)
+    codec: "auto"             # "auto" (automatycznie NVENC / AMF / QSV / libx264) lub wprost: "h264_nvenc", "h264_amf", "libx264"
     cq: 34                    # Niska jakość / mały rozmiar pliku (im niżej, tym lepiej)
-    preset: "p1"              # Najszybszy preset NVENC (p1 = fastest, p7 = best quality)
+    preset: "p1"              # Szybki preset (NVENC: p1, AMF: speed, CPU: ultrafast)
     audio_bitrate: "128k"
 
   # Finalny Master Render
   final:
     resolution: [3840, 2160]  # 4K UHD — zmień na [1920, 1080] dla Full HD
     fps: 60                   # Zmień na 30 lub 25 zależnie od materiału źródłowego
-    codec: "hevc_nvenc"       # "hevc_nvenc" (H.265) lub "h264_nvenc" (H.264)
-    cq: 19                    # Bardzo wysoka jakość master (14 = maksymalna)
-    preset: "p6"
+    codec: "auto"             # "auto" (automatycznie HEVC NVENC / AMF / QSV / libx264) lub wprost: "hevc_nvenc", "hevc_amf", "hevc_qsv", "libx264"
+    cq: 19                    # Bardzo wysoka jakość master (14 = maksymalna, 19 = optymalna)
+    preset: "p6"              # NVENC: p6, AMF: quality, CPU: fast
     tune: "hq"
     audio_codec: "aac"
     audio_bitrate: "320k"
-    hwaccel: "cuda"
+    hwaccel: "auto"           # "auto", "cuda" lub "none"

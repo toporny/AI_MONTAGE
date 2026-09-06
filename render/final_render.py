@@ -9,6 +9,7 @@ import time
 from typing import Any, Dict, List, Optional
 
 from utils.config_loader import Config
+from utils.hardware import HardwareDetector
 from utils.helpers import check_ffmpeg_nvenc, find_matching_original, format_timestamp, run_command, safe_load_json
 from utils.logger import console, logger
 
@@ -44,8 +45,23 @@ class FinalRenderer:
             logger.error(f"Katalog oryginałów 4K nie istnieje: {orig_dir}")
             return None
 
+        final_cfg = self.config.final_settings
+        req_codec = final_cfg.get("codec", "auto")
+        cq_val = int(final_cfg.get("cq", 19)) if "cq" in final_cfg else 19
+        preset_val = final_cfg.get("preset", None)
+        tune_val = final_cfg.get("tune", None)
+
+        enc_cfg = HardwareDetector.get_encoder_config(
+            target_mode="final",
+            requested_codec=req_codec,
+            cq=cq_val,
+            preset=preset_val,
+            tune=tune_val
+        )
+
         console.print(f"\n[bold green]================================================================================[/bold green]")
-        console.print(f"[bold green]        ROZPOCZYNAM FINALNY RENDER MASTER 4K / 60 FPS (NVIDIA NVENC)[/bold green]")
+        console.print(f"[bold green]        ROZPOCZYNAM FINALNY RENDER MASTER 4K / 60 FPS[/bold green]")
+        console.print(f"[bold green]        Silnik enkodera: {enc_cfg.description}[/bold green]")
         console.print(f"[bold green]================================================================================[/bold green]\n")
         console.print(f"Liczba ujęć: [bold cyan]{len(cuts)}[/bold cyan]")
         console.print(f"Katalog oryginałów: [dim]{orig_dir.resolve()}[/dim]")
@@ -53,20 +69,6 @@ class FinalRenderer:
         console.print(f"Plik docelowy: [bold yellow]{self.output_file.resolve()}[/bold yellow]\n")
 
         start_time = time.time()
-
-        has_nvenc, nvenc_codec = check_ffmpeg_nvenc()
-        cfg_codec = self.config.final_settings.get("codec", "hevc_nvenc")
-        
-        # Wybierz odpowiedni kodek NVENC
-        if has_nvenc:
-            chosen_codec = cfg_codec if (cfg_codec in ["hevc_nvenc", "h264_nvenc"]) else nvenc_codec
-        else:
-            chosen_codec = "libx264"
-            logger.warning("NVENC nie jest dostępny. Używam programowego libx264.")
-
-        cq = str(self.config.final_settings.get("cq", 19))
-        preset = self.config.final_settings.get("preset", "p6")
-        tune = self.config.final_settings.get("tune", "hq")
 
         temp_dir = self.output_dir / "temp_4k_segments"
         temp_dir.mkdir(parents=True, exist_ok=True)
@@ -76,7 +78,7 @@ class FinalRenderer:
         missing_originals = []
 
         try:
-            console.print("[yellow]Etap 1/2: Precyzyjne wycinanie i kodowanie ujęć 4K/60fps przez GPU...[/yellow]")
+            console.print("[yellow]Etap 1/2: Precyzyjne wycinanie i kodowanie ujęć 4K/60fps...[/yellow]")
             for idx, cut in enumerate(cuts, 1):
                 proxy_name = cut["source_file"]
                 s_dur = cut["duration"]
@@ -97,12 +99,7 @@ class FinalRenderer:
                         "-t", str(s_dur),
                         "-vf", "scale=3840:2160:force_original_aspect_ratio=decrease,pad=3840:2160:(ow-iw)/2:(oh-ih)/2",
                         "-r", "60",
-                        "-c:v", chosen_codec,
-                        "-preset", preset,
-                        "-tune", tune,
-                        "-rc", "vbr",
-                        "-cq", cq,
-                        "-b:v", "0",
+                        *enc_cfg.args,
                         "-pix_fmt", "yuv420p",
                         "-an",
                         str(seg_out)
@@ -125,18 +122,13 @@ class FinalRenderer:
 
                 console.print(f"  [{idx:03d}/{len(cuts):03d}] Wycinanie {orig_file.name} od {format_timestamp(s_start)} ({s_dur:.2f}s)")
 
-                # Komenda wycinania ujęcia z akceleracją GPU
+                # Komenda wycinania ujęcia
                 cmd_cut = [
                     "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
                     "-ss", str(s_start),
                     "-i", str(orig_file),
                     "-t", str(s_dur),
-                    "-c:v", chosen_codec,
-                    "-preset", preset,
-                    "-tune", tune,
-                    "-rc", "vbr",
-                    "-cq", cq,
-                    "-b:v", "0",
+                    *enc_cfg.args,
                     "-pix_fmt", "yuv420p",
                     "-r", "60",
                     "-an",  # Całkowite odcięcie oryginalnego audio
