@@ -24,8 +24,9 @@ Do dyspozycji masz wygodne, gotowe skrypty `.bat` (uruchamiane dwuklikiem):
   2. *Analiza wideo i audio* (wykrywanie twarzy, ostrości, ruchu, rytmu i dropów w muzyce)
   3. *Generowanie storyboardu* (harmonogramu cięć)
   4. *Render roboczy 480p* (`preview/preview_montage_480p.mp4`) trwający zaledwie **~25–30 sekund**!
-* 💎 **`ZROB_RENDER_4K.bat`** - po obejrzeniu i zaakceptowaniu podglądu, ten skrypt generuje docelowy film w pełnej jakości master **4K / 60 FPS** z kodowaniem sprzętowym GPU NVIDIA NVENC.
-* 🛠️ **`run.bat [komenda]`** - konsolowy dostęp do pojedynczych poleceń (`preview`, `render`, `analyze`, `sync-proxies`, `export-clips`).
+* 💎 **`ZROB_RENDER_4K.bat`** - po obejrzeniu i zaakceptowaniu podglądu, ten skrypt generuje docelowy film w pełnej jakości master **4K / 60 FPS** z kodowaniem sprzętowym GPU (NVIDIA NVENC, AMD AMF, Intel QSV lub CPU).
+* 🧹 **`WYCZYSC_PROJEKT.bat`** - bezpiecznie usuwa pliki tymczasowe, cache i rendery poprzedniego projektu, czyszcząc foldery robocze do zera przed rozpoczęciem montażu nowego filmu.
+* 🛠️ **`run.bat [komenda]`** - konsolowy dostęp do pojedynczych poleceń (`preview`, `render`, `analyze`, `sync-proxies`, `export-clips`, `clean`, `hardware`).
 
 ### 3. Jakie są możliwości konfiguracji (`config.yaml`)?
 Wszystkimi aspektami montażu sterujesz z poziomu przejrzystego pliku konfiguracyjnego `config.yaml`:
@@ -206,6 +207,77 @@ run.bat export-clips --only-4k
 
 ---
 
+### 9. Audyt sprzętu i silnika FFmpeg
+```cmd
+run.bat hardware
+```
+Szybki test i diagnostyka konfiguracji sprzętowej:
+- Wykrywa karty graficzne (NVIDIA, AMD Radeon, Intel Arc/Iris, CPU) oraz pamięć VRAM.
+- Skanuje silnik FFmpeg pod kątem wspieranych enkoderów sprzętowych (`NVENC`, `AMF`, `QSV`).
+- Wyświetla inteligentne wskazówki (np. jak pobrać pełną wersję FFmpeg z obsługą AMF pod kartę Radeon RX 580).
+
+---
+
+### 10. Czyszczenie projektu i reset do zera
+```cmd
+run.bat clean
+```
+*Program wyświetli podsumowanie katalogów do wyczyszczenia i zapyta o potwierdzenie.*
+
+Automatyczne potwierdzenie (bez pytania):
+```cmd
+run.bat clean --yes
+```
+
+---
+
+## 🧹 Rozpoczynanie nowego projektu od zera (Reset danych)
+
+Gdy skończysz montaż jednego filmu i chcesz zmontować materiały z zupełnie innego wydarzenia (np. nowe wesele, wyjazd, urodziny), musisz pozbyć się starych plików tymczasowych, cache analizy oraz wyrenderowanych podglądów.
+
+### Jak wyczyścić dane 1-kliknięciem?
+Wystarczy uruchomić dwuklikiem plik w głównym katalogu `AI_MONTAGE/`:
+👉 **`WYCZYSC_PROJEKT.bat`**
+
+Skrypt poprosi o potwierdzenie `(T/N)`, a następnie bezpiecznie opróżni katalogi robocze. Alternatywnie możesz użyć konsoli:
+```cmd
+run.bat clean --yes
+```
+
+### Co zostaje usunięte, a co zachowane?
+
+| Folder / Plik | Status | Opis |
+|---------------|--------|------|
+| `analysis/` | 🗑️ Czyszczony | Stary cache analizy wideo i muzyki (`*.json`) |
+| `storyboard/` | 🗑️ Czyszczony | Scenariusze `storyboard.json`, `storyboard.txt` oraz projekty `.osp` |
+| `preview/` | 🗑️ Czyszczony | Wyrenderowany film podglądowy 480p i listy concat |
+| `output/` | 🗑️ Czyszczony | Wyrenderowany film master 4K i tymczasowe segmenty |
+| `clips_480p/`, `clips_4k/` | 🗑️ Czyszczony | Wycięte klipy ze starego storyboardu |
+| `montage.log` | 🗑️ Resetowany | Stary dziennik zdarzeń |
+| `materialy_oryginalne/` | 🔒 **NIENARUSZONE** | Twoje oryginalne pliki wideo |
+| `kopie_robocze_480p/` | 🔒 **NIENARUSZONE** | Twoje kopie robocze proxy |
+| `sciezkadzwiekowa/` | 🔒 **NIENARUSZONE** | Twoje pliki muzyczne MP3 |
+
+> [!NOTE]
+> Same katalogi robocze (`analysis/`, `storyboard/`, itp.) **pozostają na dysku puste**, dzięki czemu system jest od razu gotowy do pracy bez konieczności ich ponownego tworzenia.
+
+### Checklista: Rozpoczęcie nowego montażu krok po kroku:
+1. **Wyczyść projekt:** Uruchom `WYCZYSC_PROJEKT.bat` (lub `run.bat clean --yes`).
+2. **Podmień pliki wideo:**
+   - Wyczyść folder `materialy_oryginalne/` i wrzuć nagrania 4K z nowego wydarzenia.
+   - Wyczyść folder `kopie_robocze_480p/` (program sam je utworzy za pomocą `run.bat sync-proxies` lub `ZROB_PREVIEW.bat`).
+3. **Podmień muzykę:** Wrzuć nowy plik MP3 do `sciezkadzwiekowa/`.
+4. **Zaktualizuj [`config.yaml`](config.yaml):**
+   - Wpisz dokładną nazwę nowego pliku: `music_file: "nazwa_nowego_utworu.mp3"`.
+   - Wyczyść listę `forced_clips` (usuń ujęcia ze starego projektu):
+     ```yaml
+     forced_clips: []
+     ```
+5. **Uruchom montaż nowego filmu:**
+   Dwukliknij `ZROB_PREVIEW.bat` lub uruchom `run.bat all`.
+
+---
+
 ## ⚙️ Konfiguracja (`config.yaml`)
 
 W pliku `config.yaml` możesz w łatwy sposób dostosować:
@@ -213,7 +285,7 @@ W pliku `config.yaml` możesz w łatwy sposób dostosować:
 - Wagi scoringu (ostrość, osoby, ruch, kompozycja, kary za rozmycie/szarpanie)
 - Długości ujęć dla poszczególnych energii muzycznych (drop, high, medium, calm)
 - Preferencje doboru (kary za powtórzenie typu kadru, kary za ponowne użycie pliku)
-- Jakość kodowania NVENC (CQ, preset `p6`, tune `hq`)
+- Jakość kodowania GPU (NVENC / AMF / QSV lub CPU)
 
 ---
 
@@ -227,6 +299,9 @@ AI_MONTAGE/
 ├── requirements.txt            # Zależności Python
 ├── setup_venv.bat              # Instalator środowiska venv
 ├── run.bat                     # Uruchamianie komend w venv
+├── ZROB_PREVIEW.bat            # 1-klik: synchronizacja, analiza, storyboard i preview 480p
+├── ZROB_RENDER_4K.bat          # 1-klik: render finalnego filmu 4K/60fps
+├── WYCZYSC_PROJEKT.bat         # 1-klik: czyszczenie cache, storyboardów i renderów do zera
 ├── README.md                   # Niniejsza dokumentacja
 ├── sync_proxies.py             # Synchronizacja kopie_robocze_480p ↔ materialy_oryginalne
 ├── export_clips.py             # Eksport poszczególnych ujęć do clips_4k/ i clips_480p/
