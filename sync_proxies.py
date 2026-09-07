@@ -14,6 +14,7 @@ Uruchamianie (w katalogu AI_MONTAGE):
 
 import argparse
 import concurrent.futures
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -111,7 +112,13 @@ def get_proxy_encoder_config(force_cpu: bool = False) -> tuple[list[str], str]:
         return ["-c:v", "libx264", "-preset", "fast", "-crf", "28"], f"CPU (libx264) [Domyślny: {e}]"
 
 
-def compress_to_proxy(original: Path, output: Path, dry_run: bool, encoder_args: list[str]) -> bool:
+def compress_to_proxy(
+    original: Path,
+    output: Path,
+    dry_run: bool,
+    encoder_args: list[str],
+    threads: int = 4
+) -> bool:
     """Kompresuje oryginalny plik do proxy 480p/15fps z akceleracją sprzętową."""
     safe_print(f"  ➕ TWORZĘ PROXY: {original.name}  →  {output.name}")
     if dry_run:
@@ -121,25 +128,45 @@ def compress_to_proxy(original: Path, output: Path, dry_run: bool, encoder_args:
     # Optymalizacje wydajnościowe:
     # 1. 'fps=15' PRZED 'scale' — odrzuca klatki (np. 45 z 60) przed skalowaniem, redukując obciążenie o 75%!
     # 2. 'flags=fast_bilinear' — szybkie skalowanie dwuliniowe w swscale.
+    # 3. '-c:a copy' — natychmiastowe, bezstratne kopiowanie audio bez obciążania CPU (0% narzutu na dźwięk).
+    # 4. '-threads <N>' — ograniczenie wątków per proces FFmpeg, zapobiegające rywalizacji o cache i throttlingowi.
     vf_filter = "fps=15,scale=854:480:force_original_aspect_ratio=decrease:flags=fast_bilinear,pad=854:480:(ow-iw)/2:(oh-ih)/2"
 
     cmd = [
         "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+        "-threads", str(threads),
         "-i", str(original),
         "-vf", vf_filter,
         "-r", "15",
         *encoder_args,
-        "-c:a", "aac",
-        "-b:a", "64k",
+        "-c:a", "copy",
         "-movflags", "+faststart",
         str(output),
     ]
     result = subprocess.run(cmd)
     if result.returncode != 0:
-        # Automatyczny fallback na czysty procesor CPU (libx264) jeśli enkoder sprzętowy zgłosił błąd
+        # Fallback 1: jeśli kontener nie przyjmuje strumienia audio z -c:a copy, przelicz audio do AAC
+        retry_audio_cmd = [
+            "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+            "-threads", str(threads),
+            "-i", str(original),
+            "-vf", vf_filter,
+            "-r", "15",
+            *encoder_args,
+            "-c:a", "aac",
+            "-b:a", "64k",
+            "-movflags", "+faststart",
+            str(output),
+        ]
+        retry_res = subprocess.run(retry_audio_cmd)
+        if retry_res.returncode == 0:
+            return True
+
+        # Fallback 2: automatyczny fallback na czysty procesor CPU (libx264) jeśli enkoder sprzętowy zgłosił błąd
         if "libx264" not in encoder_args:
             fallback_cmd = [
                 "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+                "-threads", str(threads),
                 "-i", str(original),
                 "-vf", vf_filter,
                 "-r", "15",
@@ -219,12 +246,13 @@ def main():
 
     if to_compress:
         workers = max(1, args.workers)
+        threads_per_worker = max(2, min(8, (os.cpu_count() or 4) // workers))
         if workers > 1 and len(to_compress) > 1 and not args.dry_run:
             actual_workers = min(workers, len(to_compress))
-            print(f"\n  ⚡ Przetwarzanie równoległe: {len(to_compress)} plików na {actual_workers} wątkach...\n")
+            print(f"\n  ⚡ Przetwarzanie równoległe: {len(to_compress)} plików na {actual_workers} wątkach (po {threads_per_worker} wątki FFmpeg)...\n")
             with concurrent.futures.ThreadPoolExecutor(max_workers=actual_workers) as executor:
                 future_to_file = {
-                    executor.submit(compress_to_proxy, orig, target, args.dry_run, encoder_args): orig
+                    executor.submit(compress_to_proxy, orig, target, args.dry_run, encoder_args, threads_per_worker): orig
                     for orig, target in to_compress
                 }
                 for future in concurrent.futures.as_completed(future_to_file):
@@ -232,7 +260,7 @@ def main():
                         added += 1
         else:
             for orig_path, target_proxy in to_compress:
-                success = compress_to_proxy(orig_path, target_proxy, args.dry_run, encoder_args)
+                success = compress_to_proxy(orig_path, target_proxy, args.dry_run, encoder_args, threads_per_worker)
                 if success:
                     added += 1
 
