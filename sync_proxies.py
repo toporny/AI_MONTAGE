@@ -16,6 +16,7 @@ import argparse
 import re
 import subprocess
 import sys
+import time
 
 # Wymusz UTF-8 na stdout/stderr (Windows cmd/powershell może defaultować do cp1250)
 if sys.stdout.encoding.lower() not in ("utf-8", "utf_8"):
@@ -83,20 +84,64 @@ def build_original_map(oryginaly_dir: Path) -> dict[str, Path]:
     return mapping
 
 
-def compress_to_proxy(original: Path, output: Path, dry_run: bool) -> bool:
-    """Kompresuje oryginalny plik do proxy 480p/15fps."""
+def get_proxy_encoder_config(force_cpu: bool = False) -> tuple[list[str], str]:
+    """
+    Automatycznie dobiera akcelerację sprzętową (AMF dla AMD, NVENC dla NVIDIA, QSV dla Intel)
+    lub bezpieczny fallback na CPU (libx264).
+    """
+    if force_cpu:
+        return ["-c:v", "libx264", "-preset", "fast", "-crf", "28"], "CPU (libx264) [Wymuszone przez --cpu]"
+
+    try:
+        from utils.hardware import HardwareDetector
+        enc = HardwareDetector.get_encoder_config(target_mode="preview", requested_codec="auto")
+        return enc.args, enc.description
+    except Exception as e:
+        return ["-c:v", "libx264", "-preset", "fast", "-crf", "28"], f"CPU (libx264) [Domyślny: {e}]"
+
+
+def compress_to_proxy(original: Path, output: Path, dry_run: bool, encoder_args: list[str]) -> bool:
+    """Kompresuje oryginalny plik do proxy 480p/15fps z akceleracją sprzętową."""
     print(f"  ➕ TWORZĘ PROXY: {original.name}  →  {output.name}")
     if dry_run:
         return True
     output.parent.mkdir(parents=True, exist_ok=True)
+
+    vf_filter = "scale=854:480:force_original_aspect_ratio=decrease,pad=854:480:(ow-iw)/2:(oh-ih)/2"
+
     cmd = [
         "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+        "-hwaccel", "auto",
         "-i", str(original),
-        *PROXY_FFMPEG_OPTS,
+        "-vf", vf_filter,
+        "-r", "15",
+        *encoder_args,
+        "-c:a", "aac",
+        "-b:a", "64k",
+        "-movflags", "+faststart",
         str(output),
     ]
     result = subprocess.run(cmd)
     if result.returncode != 0:
+        # Automatyczny fallback na procesor CPU (libx264) jeśli enkoder sprzętowy zgłosił błąd
+        if "libx264" not in encoder_args:
+            fallback_cmd = [
+                "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+                "-i", str(original),
+                "-vf", vf_filter,
+                "-r", "15",
+                "-c:v", "libx264",
+                "-preset", "fast",
+                "-crf", "28",
+                "-c:a", "aac",
+                "-b:a", "64k",
+                "-movflags", "+faststart",
+                str(output),
+            ]
+            fb_res = subprocess.run(fallback_cmd)
+            if fb_res.returncode == 0:
+                return True
+
         print(f"    ❌ FFmpeg błąd dla {original.name}", file=sys.stderr)
         return False
     return True
@@ -105,9 +150,11 @@ def compress_to_proxy(original: Path, output: Path, dry_run: bool) -> bool:
 def main():
     parser = argparse.ArgumentParser(description="Synchronizacja ANALIZA_480P z ORYGINALY")
     parser.add_argument("--dry-run", action="store_true", help="Tryb podglądu — nie wykonuje żadnych zmian")
+    parser.add_argument("--cpu", action="store_true", help="Wymusza kodowanie na procesorze CPU (libx264) zamiast sprzętowego GPU")
     parser.add_argument("--oryginaly", default=str(ORYGINALY_DIR), help="Ścieżka do katalogu oryginałów")
     parser.add_argument("--analiza",   default=str(ANALIZA_DIR),   help="Ścieżka do katalogu proxy 480p")
     args = parser.parse_args()
+    start_time = time.time()
 
     oryginaly_dir = Path(args.oryginaly)
     analiza_dir   = Path(args.analiza)
@@ -131,11 +178,14 @@ def main():
         print(f"{'='*70}\n")
         sys.exit(1)
 
+    encoder_args, encoder_desc = get_proxy_encoder_config(args.cpu)
+
     mode = "[DRY-RUN]" if args.dry_run else "[SYNC]"
     print(f"\n{'='*70}")
     print(f"  {mode} Synchronizacja proxy 480p")
     print(f"  ORYGINALY   : {oryginaly_dir}")
     print(f"  ANALIZA_480P: {analiza_dir}")
+    print(f"  SILNIK WIDEO: {encoder_desc}")
     print(f"{'='*70}\n")
 
     added   = 0
@@ -150,7 +200,7 @@ def main():
             print(f"  ✅ OK     : {orig_path.name}")
         else:
             target_proxy = analiza_dir / proxy_name_for(orig_path)
-            success = compress_to_proxy(orig_path, target_proxy, args.dry_run)
+            success = compress_to_proxy(orig_path, target_proxy, args.dry_run, encoder_args)
             if success:
                 added += 1
 
@@ -164,11 +214,20 @@ def main():
             removed += 1
 
     # --- Podsumowanie ---
+    elapsed = time.time() - start_time
+    if elapsed >= 60:
+        mins = int(elapsed // 60)
+        secs = elapsed % 60
+        time_str = f"{elapsed:.1f} s ({mins} min {secs:.1f} s)"
+    else:
+        time_str = f"{elapsed:.1f} s"
+
     print(f"\n{'='*70}")
     print(f"  Podsumowanie {mode}:")
     print(f"    ✅ Już zsynchronizowanych : {ok}")
     print(f"    ➕ Dodanych (skompresowanych): {added}")
     print(f"    🗑️  Usuniętych (orphan)   : {removed}")
+    print(f"    ⏱️  Czas przetwarzania      : {time_str}")
     if args.dry_run:
         print(f"\n  ⚠️  Tryb DRY-RUN — żadne pliki nie zostały zmienione!")
     print(f"{'='*70}\n")
