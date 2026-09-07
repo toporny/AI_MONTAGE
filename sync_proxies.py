@@ -13,9 +13,12 @@ Uruchamianie (w katalogu AI_MONTAGE):
 """
 
 import argparse
+import concurrent.futures
+from pathlib import Path
 import re
 import subprocess
 import sys
+import threading
 import time
 
 # Wymusz UTF-8 na stdout/stderr (Windows cmd/powershell może defaultować do cp1250)
@@ -23,7 +26,15 @@ if sys.stdout.encoding.lower() not in ("utf-8", "utf_8"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 if sys.stderr.encoding.lower() not in ("utf-8", "utf_8"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-from pathlib import Path
+
+_print_lock = threading.Lock()
+
+
+def safe_print(*args, **kwargs):
+    """Bezpieczne wypisywanie na konsolę w środowisku wielowątkowym."""
+    with _print_lock:
+        print(*args, **kwargs)
+
 
 # ---------------------------------------------------------------------------
 # Konfiguracja ścieżek (względem katalogu tego skryptu)
@@ -38,9 +49,9 @@ VIDEO_EXTS = {".mp4", ".MP4", ".mov", ".MOV", ".mkv", ".MKV", ".avi", ".AVI"}
 # Sufiks doklejany do nazwy proxy
 PROXY_SUFFIX = "_480p15"
 
-# Parametry kompresji
+# Parametry kompresji (fps=15 przed scale odrzuca klatki przed skalowaniem)
 PROXY_FFMPEG_OPTS = [
-    "-vf", "scale=854:480:force_original_aspect_ratio=decrease,pad=854:480:(ow-iw)/2:(oh-ih)/2",
+    "-vf", "fps=15,scale=854:480:force_original_aspect_ratio=decrease:flags=fast_bilinear,pad=854:480:(ow-iw)/2:(oh-ih)/2",
     "-r", "15",
     "-c:v", "libx264",
     "-crf", "28",
@@ -84,33 +95,74 @@ def build_original_map(oryginaly_dir: Path) -> dict[str, Path]:
     return mapping
 
 
-def get_proxy_encoder_config(force_cpu: bool = False) -> tuple[list[str], str]:
+def is_d3d11va_supported() -> bool:
+    """Sprawdza czy FFmpeg wspiera akcelerację dekodowania d3d11va (Windows)."""
+    if sys.platform != "win32":
+        return False
+    try:
+        res = subprocess.run(
+            ["ffmpeg", "-hide_banner", "-hwaccels"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=3
+        )
+        return "d3d11va" in res.stdout.lower()
+    except Exception:
+        return False
+
+
+def get_proxy_encoder_config(force_cpu: bool = False, no_hwaccel_decode: bool = False) -> tuple[list[str], list[str], str]:
     """
-    Automatycznie dobiera akcelerację sprzętową (AMF dla AMD, NVENC dla NVIDIA, QSV dla Intel)
+    Automatycznie dobiera akcelerację sprzętową:
+    - hwaccel_args: opcje dekodowania wejścia (D3D11VA na Windows dla GPU)
+    - encoder_args: opcje enkodera wyjściowego (AMF dla AMD, NVENC dla NVIDIA, QSV dla Intel)
     lub bezpieczny fallback na CPU (libx264).
+    Zwraca: (hwaccel_args, encoder_args, opis)
     """
     if force_cpu:
-        return ["-c:v", "libx264", "-preset", "fast", "-crf", "28"], "CPU (libx264) [Wymuszone przez --cpu]"
+        return [], ["-c:v", "libx264", "-preset", "fast", "-crf", "28"], "CPU (libx264) [Wymuszone przez --cpu]"
+
+    hwaccel_args = []
+    if not no_hwaccel_decode and is_d3d11va_supported():
+        hwaccel_args = ["-hwaccel", "d3d11va"]
 
     try:
         from utils.hardware import HardwareDetector
         enc = HardwareDetector.get_encoder_config(target_mode="preview", requested_codec="auto")
-        return enc.args, enc.description
+        desc = enc.description
+        if hwaccel_args and enc.is_hardware:
+            desc += " + Dekoder D3D11VA"
+        elif not enc.is_hardware:
+            hwaccel_args = []
+        return hwaccel_args, enc.args, desc
     except Exception as e:
-        return ["-c:v", "libx264", "-preset", "fast", "-crf", "28"], f"CPU (libx264) [Domyślny: {e}]"
+        desc = f"CPU (libx264) [Domyślny: {e}]"
+        return [], ["-c:v", "libx264", "-preset", "fast", "-crf", "28"], desc
 
 
-def compress_to_proxy(original: Path, output: Path, dry_run: bool, encoder_args: list[str]) -> bool:
+def compress_to_proxy(
+    original: Path,
+    output: Path,
+    dry_run: bool,
+    encoder_args: list[str],
+    hwaccel_args: list[str] | None = None
+) -> bool:
     """Kompresuje oryginalny plik do proxy 480p/15fps z akceleracją sprzętową."""
-    print(f"  ➕ TWORZĘ PROXY: {original.name}  →  {output.name}")
+    safe_print(f"  ➕ TWORZĘ PROXY: {original.name}  →  {output.name}")
     if dry_run:
         return True
     output.parent.mkdir(parents=True, exist_ok=True)
 
-    vf_filter = "scale=854:480:force_original_aspect_ratio=decrease,pad=854:480:(ow-iw)/2:(oh-ih)/2"
+    # Optymalizacje wydajnościowe:
+    # 1. 'fps=15' PRZED 'scale' — odrzuca klatki (np. 45 z 60) przed skalowaniem, redukując obciążenie o 75%!
+    # 2. 'flags=fast_bilinear' — szybkie skalowanie dwuliniowe w swscale.
+    vf_filter = "fps=15,scale=854:480:force_original_aspect_ratio=decrease:flags=fast_bilinear,pad=854:480:(ow-iw)/2:(oh-ih)/2"
 
+    hw_args = hwaccel_args or []
     cmd = [
         "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+        *hw_args,
         "-i", str(original),
         "-vf", vf_filter,
         "-r", "15",
@@ -122,8 +174,8 @@ def compress_to_proxy(original: Path, output: Path, dry_run: bool, encoder_args:
     ]
     result = subprocess.run(cmd)
     if result.returncode != 0:
-        # Automatyczny fallback na procesor CPU (libx264) jeśli enkoder sprzętowy zgłosił błąd
-        if "libx264" not in encoder_args:
+        # Automatyczny fallback na czysty procesor CPU (libx264 bez hwaccel)
+        if "libx264" not in encoder_args or hw_args:
             fallback_cmd = [
                 "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
                 "-i", str(original),
@@ -141,7 +193,7 @@ def compress_to_proxy(original: Path, output: Path, dry_run: bool, encoder_args:
             if fb_res.returncode == 0:
                 return True
 
-        print(f"    ❌ FFmpeg błąd dla {original.name}", file=sys.stderr)
+        safe_print(f"    ❌ FFmpeg błąd dla {original.name}", file=sys.stderr)
         return False
     return True
 
@@ -150,6 +202,8 @@ def main():
     parser = argparse.ArgumentParser(description="Synchronizacja ANALIZA_480P z ORYGINALY")
     parser.add_argument("--dry-run", action="store_true", help="Tryb podglądu — nie wykonuje żadnych zmian")
     parser.add_argument("--cpu", action="store_true", help="Wymusza kodowanie na procesorze CPU (libx264) zamiast sprzętowego GPU")
+    parser.add_argument("--workers", "-j", type=int, default=2, help="Liczba równoległych wątków konwersji (domyślnie: 2)")
+    parser.add_argument("--no-hwaccel-decode", action="store_true", help="Wyłącza sprzętowe dekodowanie wejścia D3D11VA")
     parser.add_argument("--oryginaly", default=str(ORYGINALY_DIR), help="Ścieżka do katalogu oryginałów")
     parser.add_argument("--analiza",   default=str(ANALIZA_DIR),   help="Ścieżka do katalogu proxy 480p")
     args = parser.parse_args()
@@ -177,7 +231,7 @@ def main():
         print(f"{'='*70}\n")
         sys.exit(1)
 
-    encoder_args, encoder_desc = get_proxy_encoder_config(args.cpu)
+    hwaccel_args, encoder_args, encoder_desc = get_proxy_encoder_config(args.cpu, args.no_hwaccel_decode)
 
     mode = "[DRY-RUN]" if args.dry_run else "[SYNC]"
     print(f"\n{'='*70}")
@@ -193,15 +247,33 @@ def main():
 
     # --- 1. Sprawdź brakujące proxy ---
     print("Krok 1/2: Sprawdzanie brakujących proxy...\n")
+    to_compress: list[tuple[Path, Path]] = []
     for orig_stem_lower, orig_path in sorted(original_map.items()):
         if orig_stem_lower in proxy_map:
             ok += 1
             print(f"  ✅ OK     : {orig_path.name}")
         else:
             target_proxy = analiza_dir / proxy_name_for(orig_path)
-            success = compress_to_proxy(orig_path, target_proxy, args.dry_run, encoder_args)
-            if success:
-                added += 1
+            to_compress.append((orig_path, target_proxy))
+
+    if to_compress:
+        workers = max(1, args.workers)
+        if workers > 1 and len(to_compress) > 1 and not args.dry_run:
+            actual_workers = min(workers, len(to_compress))
+            print(f"\n  ⚡ Przetwarzanie równoległe: {len(to_compress)} plików na {actual_workers} wątkach...\n")
+            with concurrent.futures.ThreadPoolExecutor(max_workers=actual_workers) as executor:
+                future_to_file = {
+                    executor.submit(compress_to_proxy, orig, target, args.dry_run, encoder_args, hwaccel_args): orig
+                    for orig, target in to_compress
+                }
+                for future in concurrent.futures.as_completed(future_to_file):
+                    if future.result():
+                        added += 1
+        else:
+            for orig_path, target_proxy in to_compress:
+                success = compress_to_proxy(orig_path, target_proxy, args.dry_run, encoder_args, hwaccel_args)
+                if success:
+                    added += 1
 
     # --- 2. Sprawdź nadmiarowe (orphan) proxy ---
     print(f"\nKrok 2/2: Sprawdzanie nadmiarowych proxy (orphan)...\n")
