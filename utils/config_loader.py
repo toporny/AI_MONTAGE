@@ -27,6 +27,9 @@ class Config:
         self.preview_dir = self._resolve_path(paths_section.get("preview_dir", "preview"))
         self.output_dir = self._resolve_path(paths_section.get("output_dir", "output"))
 
+        # Automatyczne zapewnienie istnienia katalogów
+        self.ensure_directories()
+
         # Statyczny obraz outro (opcjonalny)
         outro_raw = paths_section.get("outro_image", "")
         self.outro_image_path: Optional[Path] = Path(outro_raw) if outro_raw else None
@@ -34,8 +37,25 @@ class Config:
         # Słowo kluczowe outro wideo — klip z tym słowem w nazwie będzie ostatnim ujęciem
         self.outro_video_keyword: str = str(raw_config.get("outro_video_keyword", "")).strip()
 
-        # Lista wymuszonych ujęć: [{file: str, clip_time_start_sec: float|None, clip_time_end_sec: float|None}, ...]
-        forced_raw = raw_config.get("forced_clips", []) or []
+        # Ścieżka do pliku z wymuszonymi ujęciami
+        forced_file_name = raw_config.get("forced_clips_file", "forced_clips.yaml")
+        self.forced_clips_file = self._resolve_path(forced_file_name)
+
+        # Załaduj forced_clips z dedykowanego pliku YAML (lub z config.yaml w razie potrzeby)
+        forced_raw = []
+        if self.forced_clips_file.exists():
+            try:
+                with open(self.forced_clips_file, "r", encoding="utf-8") as f:
+                    fc_data = yaml.safe_load(f) or {}
+                    if isinstance(fc_data, dict):
+                        forced_raw = fc_data.get("forced_clips", []) or []
+                    elif isinstance(fc_data, list):
+                        forced_raw = fc_data
+            except Exception as e:
+                logger.warning(f"Błąd odczytu pliku {self.forced_clips_file.name}: {e}")
+        elif "forced_clips" in raw_config:
+            forced_raw = raw_config.get("forced_clips", []) or []
+
         self.forced_clips: List[Dict[str, Any]] = []
         for entry in forced_raw:
             if not isinstance(entry, dict) or "file" not in entry:
@@ -51,13 +71,13 @@ class Config:
                 sep = "=" * 70
                 err_msg = (
                     f"\n{sep}\n"
-                    f"  BŁĄD KRYTYCZNY KONFIGURACJI config.yaml (forced_clips):\n"
+                    f"  BŁĄD KRYTYCZNY KONFIGURACJI forced_clips:\n"
                     f"{sep}\n"
                     f"  Dla wymuszonego klipu '{file_name}' podano JEDNOCZEŚNIE:\n"
                     f"    - clip_time_start: {raw_start}\n"
                     f"    - clip_time_end:   {raw_end}\n\n"
                     f"  Parametry te wzajemnie się wykluczają!\n"
-                    f"  Wybierz tylko jeden z nich:\n"
+                    f"  Wybierz tylko jeden z nich w pliku {self.forced_clips_file.name}:\n"
                     f"    * clip_time_start - jeśli chcesz, aby ujęcie ZACZYNAŁO się od podanego momentu.\n"
                     f"    * clip_time_end   - jeśli chcesz, aby ujęcie KOŃCZYŁO się dokładnie w podanym momencie.\n"
                     f"{sep}\n"
@@ -158,10 +178,33 @@ class Config:
             return p
         return (self.base_dir / p).resolve()
 
+    def ensure_directories(self):
+        """Upewnia się, że wszystkie wymagane katalogi projektu istnieją na dysku."""
+        dirs_to_create = [
+            self.proxy_dir,
+            self.original_dir,
+            self.music_dir,
+            self.cache_dir,
+            self.storyboard_dir,
+            self.preview_dir,
+            self.output_dir,
+            self.base_dir / "clips_4k",
+            self.base_dir / "clips_480p",
+            self.base_dir / "outro_image",
+        ]
+        for d in dirs_to_create:
+            try:
+                d.mkdir(parents=True, exist_ok=True)
+            except Exception:
+                pass
+
     def get_music_file_path(self) -> Optional[Path]:
-        """Zwraca bezwzględną ścieżkę do pliku muzycznego. Wymaga podania konkretnego pliku w config.yaml."""
-        if not self.music_file:
-            logger.error("Nie zdefiniowano 'music_file' w pliku konfiguracyjnym config.yaml! Wymagane jest podanie konkretnego pliku MP3.")
+        """Zwraca bezwzględną ścieżkę do pliku muzycznego. Wymaga podania konkretnego pliku w config.yaml (strict match)."""
+        if not self.music_file or not str(self.music_file).strip():
+            logger.error(
+                "Nie zdefiniowano 'music_file' w pliku config.yaml!\n"
+                "Wpisz dokładną nazwę pliku muzycznego z katalogu 'sciezkadzwiekowa/' (np. 'sciezka_dzwiekowa.mp3')."
+            )
             return None
 
         mf = Path(self.music_file)
@@ -177,7 +220,12 @@ class Config:
         if in_base.exists():
             return in_base
 
-        logger.error(f"Nie znaleziono wskazanego pliku muzycznego '{self.music_file}' w katalogu {self.music_dir}!")
+        logger.error(
+            f"Nie znaleziono wskazanego pliku muzycznego '{self.music_file}' w katalogu:\n"
+            f"  📁 {self.music_dir.resolve()}\n"
+            f"Upewnij się, że plik o dokładnie takiej nazwie znajduje się w tym folderze "
+            f"lub zmień parametr 'music_file' w pliku 'config.yaml'."
+        )
         return None
 
 

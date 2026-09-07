@@ -112,11 +112,24 @@ def main():
     oryginaly_dir = Path(args.oryginaly)
     analiza_dir   = Path(args.analiza)
 
-    if not oryginaly_dir.exists():
-        print(f"❌ Katalog oryginałów nie istnieje: {oryginaly_dir}", file=sys.stderr)
-        sys.exit(1)
-
+    oryginaly_dir.mkdir(parents=True, exist_ok=True)
     analiza_dir.mkdir(parents=True, exist_ok=True)
+
+    original_map = build_original_map(oryginaly_dir)
+    proxy_map    = build_proxy_map(analiza_dir)
+
+    if not original_map and not proxy_map:
+        print(f"\n{'='*70}")
+        print("  AI MONTAGE -- INSTRUKCJA STARTOWA (BRAK PLIKOW WIDEO)")
+        print(f"{'='*70}\n")
+        print("  Projekt jest gotowy, ale w katalogu roboczym nie znaleziono plikow wideo.")
+        print("  Aby rozpoczac:")
+        print(f"    1. Wgraj pliki wideo (np. z aparatu lub telefonu) do folderu:")
+        print(f"       📁 {oryginaly_dir.resolve()}\n")
+        print("    2. Uruchom ponownie:")
+        print("       👉 ZROB_PREVIEW.bat (lub w konsoli: run.bat sync-proxies)\n")
+        print(f"{'='*70}\n")
+        sys.exit(1)
 
     mode = "[DRY-RUN]" if args.dry_run else "[SYNC]"
     print(f"\n{'='*70}")
@@ -124,9 +137,6 @@ def main():
     print(f"  ORYGINALY   : {oryginaly_dir}")
     print(f"  ANALIZA_480P: {analiza_dir}")
     print(f"{'='*70}\n")
-
-    original_map = build_original_map(oryginaly_dir)
-    proxy_map    = build_proxy_map(analiza_dir)
 
     added   = 0
     removed = 0

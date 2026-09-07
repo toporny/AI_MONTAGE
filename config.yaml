@@ -17,8 +17,8 @@ paths:
   # Katalog z plikami muzycznymi MP3
   music_dir: "sciezkadzwiekowa"
 
-  # Wybrany plik MP3 do montażu (wymagana dokładna nazwa pliku w music_dir lub ścieżka)
-  music_file: "Płomień (Catchy Power Remix)(3).mp3"
+  # Wybrany plik MP3 do montażu (dokładna nazwa pliku w music_dir)
+  music_file: "sciezka_dzwiekowa.mp3"
 
   # Katalogi robocze (względne do lokalizacji config.yaml)
   cache_dir: "analysis"
@@ -28,8 +28,7 @@ paths:
 
   # Statyczny obraz końcowy zastępujący ostatnie ujęcie montażu (opcjonalne)
   # Zostaw puste ("") jeśli chcesz używać normalnego klipu wideo jako outro
-  # Przykład: "outro_image/outro.jpg"
-  outro_image: "outro_image/outro.jpg"
+  outro_image: ""
 
 # OUTRO WIDEO (alternatywa dla outro_image)
 # Słowo kluczowe w nazwie pliku proxy — klip zawierający to słowo
@@ -39,84 +38,11 @@ paths:
 outro_video_keyword: ""
 
 # ==============================================================================
-# LISTA WYMUSZONYCH UJĘĆ
+# WYMUSZONE UJĘCIA (forced_clips)
 # ==============================================================================
-# Ujęcia z tej listy ZAWSZE znajdą się w finalnym montażu.
-# Program wybierze najlepszy fragment z danego klipu (ostrość, osoby, ruch)
-# i przytnie go do odpowiedniej długości dopasowanej do rytmu muzyki.
-#
-# WAŻNE — DOPASOWANIE ŚCISŁE (exact match):
-#   Pole "file" musi być DOKŁADNĄ nazwą pliku (bez rozszerzenia i bez _480p15).
-#   Jeśli plik nie istnieje w kopie_robocze_480p/ → program zakończy się błędem (ABORT).
-#
-#   Skąd wziąć nazwę pliku?
-#   → Otwórz katalog kopie_robocze_480p/
-#   → Znajdź interesujący cię plik, np.: 29_125240_piata_mowczyni_na_scenie_b_480p15.mp4
-#   → Wpisz jego nazwę BEZ _480p15 i BEZ .mp4, czyli: 29_125240_piata_mowczyni_na_scenie_b
-#   → Możesz też wpisać pełną nazwę z _480p15 lub z .mp4 — program sam odtnie sufiks
-#
-# Każda pozycja na liście:
-#   file: (wymagane) dokładna nazwa pliku (patrz wyżej)
-#   clip_time_start: (opcjonalne) punkt startowy wewnątrz nagrania źródłowego (od kiedy wycinać)
-#                    Formaty: "0:03" = od 3. sekundy | "15" = od 15. sekundy nagrania
-#                    Wszystko przed tą chwilą zostanie pominięte!
-#   clip_time_end:   (opcjonalne) punkt końcowy wewnątrz nagrania źródłowego (kiedy ujęcie ma się skończyć)
-#                    Formaty: "0:10" = ujęcie skończy się dokładnie w 10. sekundzie nagrania źródłowego
-#                    Algorytm dobierze początek wstecz w rytm muzyki.
-#
-#   WAŻNE: clip_time_start i clip_time_end NIE MOGĄ występować naraz dla tego samego ujęcia!
-#          Jeśli oba zostaną podane, program przerwie działanie z błędem wyjaśniającym.
-#
-# Przykłady:
-#   forced_clips:
-#     - file: "29_125240_piata_mowczyni_na_scenie_b"
-#       clip_time_start: "0:03"     # zacznij wycinać od 3. sekundy tego klipu
-#     - file: "29_130535_ludzie_zbieraja_sie_na_sciance_c"
-#     - file: "28_193407_kolacja_wieczorna"
-#       clip_time_end: "0:12"       # ujęcie ma zakończyć się dokładnie w 12. sekundzie
-# ==============================================================================
-forced_clips:
-  - file: "29_125240_piata_mowczyni_na_scenie_b"
-    clip_time_start: "0:03"
-  - file: "29_235041_magda_geba_i"
-    clip_time_start: "0:00"
-  - file: "29_233037_stukamy_sie_szampanem"
-    clip_time_start: "0:01"
-  - file: "29_113754_karolina_macha"
-    clip_time_start: "0:06"
-  - file: "28_175737_karolina_przed_bannerem"
-    clip_time_start: "0:04"
-  - file: "28_200543_drewutnia_karolina_siedzi"
-    clip_time_start: "0:00"
-  - file: "29_095735_dziewczyna_na_sciance"
-    clip_time_end: "0:18"
-  - file: "29_095735_dziewczyna_na_sciance2"
-    clip_time_start: "0:00"
-  - file: "29_095941_ludzien_na_sciance3_fajne_ujecie"
-    clip_time_end: "0:17"
-  - file: "29_103743_ludzie_klaszcza_2"
-    clip_time_start: "0:00"
-  - file: "28_183658_drugi_mowca_a_x2"
-    clip_time_start: "0:07"
-  - file: "29_104131_monika_szlachta"
-    clip_time_start: "0:15"
-  - file: "29_122922_drugi_mowca_na_scenie_sumienie_a"
-    clip_time_start: "0:02"
-  - file: "29_130535_ludzie_zbieraja_sie_na_sciance_c"
-  - file: "29_210602_wejscie_na_duza_gale"
-    clip_time_start: "0:00"
-  - file: "29_211355_najdalszy_stolik"
-    clip_time_start: "0:03"
-  - file: "29_235041_magda_geba_i.mp4"
-    clip_time_start: "0:00"
-  - file: "29_230919_raper_sie_buja"
-    clip_time_start: "0:00"
-  - file: "30_000541_wjazd_na_lustro_d"
-    clip_time_start: "0:01"
-  - file: "30_135349_karolina_odbiera_nagrode"
-    clip_time_start: "0:02"
-  - file: "30_135520_ludzie_na_koncu_z_dyplomami_a"
-    clip_time_start: "0:00"
+# Ścieżka do dedykowanego pliku YAML z listą ujęć gwarantowanych w montażu.
+# Domyślnie ujęcia definiuje się w pliku: forced_clips.yaml
+forced_clips_file: "forced_clips.yaml"
 
 # ANALIZA WIDEO
 video_analysis:

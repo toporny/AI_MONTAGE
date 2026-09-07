@@ -54,9 +54,7 @@ class VideoAnalyzer:
         Wznawia pracę od miejsca przerwania dzięki plikom cache JSON.
         """
         proxy_dir = self.config.proxy_dir
-        if not proxy_dir.exists():
-            logger.error(f"Katalog proxy nie istnieje: {proxy_dir}")
-            return []
+        proxy_dir.mkdir(parents=True, exist_ok=True)
 
         # Wyszukaj wszystkie unikalne pliki wideo (obsługa Windows bez duplikatów)
         seen_paths = set()

@@ -29,24 +29,30 @@ pip-log.txt
 .env.local
 
 # ==============================================================================
-# PLIKI GENEROWANE PRZEZ PROJEKT (można je odtworzyć komendami)
+# PLIKI GENEROWANE PRZEZ PROJEKT (katalogi zachowane w Git przez .gitkeep)
 # ==============================================================================
 
 # Cache analizy wideo — generowany przez: run.bat analyze
-analysis/
+analysis/*
+!analysis/.gitkeep
 
 # Storyboard — generowany przez: run.bat create-storyboard
-storyboard/
+storyboard/*
+!storyboard/.gitkeep
 
 # Preview — generowany przez: run.bat preview
-preview/
+preview/*
+!preview/.gitkeep
 
 # Finalny render — generowany przez: run.bat render
-output/
+output/*
+!output/.gitkeep
 
 # Fragmenty ujęć — generowane przez: run.bat export-clips
-clips_4k/
-clips_480p/
+clips_4k/*
+!clips_4k/.gitkeep
+clips_480p/*
+!clips_480p/.gitkeep
 
 # ==============================================================================
 # MODELE AI (pobierane automatycznie przez bibliotekę ultralytics)
@@ -90,18 +96,22 @@ $RECYCLE.BIN/
 .Trash-*
 
 # ==============================================================================
-# DUŻE PLIKI MEDIÓW (znajdują się wewnątrz AI_MONTAGE/)
+# DUŻE PLIKI MEDIÓW (katalogi zachowane w Git przez .gitkeep)
 # ==============================================================================
 
 # Oryginalne nagrania 4K (za duże na git — dziesiątki GB)
-materialy_oryginalne/
+materialy_oryginalne/*
+!materialy_oryginalne/.gitkeep
 
 # Proxy video 480p (generowane przez: run.bat sync-proxies)
-kopie_robocze_480p/
+kopie_robocze_480p/*
+!kopie_robocze_480p/.gitkeep
 
 # Pliki muzyczne MP3 (prawa autorskie / duże pliki binarne)
-sciezkadzwiekowa/
+sciezkadzwiekowa/*
+!sciezkadzwiekowa/.gitkeep
 
-# Statyczny obraz outro (opcjonalny, mały plik JPG/PNG - można commitować lub zignorować)
-# outro_image/
+# Statyczny obraz outro (katalog zachowany)
+outro_image/*
+!outro_image/.gitkeep
 

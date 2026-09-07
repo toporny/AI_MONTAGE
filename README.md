@@ -277,13 +277,10 @@ run.bat clean --yes
 2. **Podmień pliki wideo:**
    - Wyczyść folder `materialy_oryginalne/` i wrzuć nagrania 4K z nowego wydarzenia.
    - Wyczyść folder `kopie_robocze_480p/` (program sam je utworzy za pomocą `run.bat sync-proxies` lub `ZROB_PREVIEW.bat`).
-3. **Podmień muzykę:** Wrzuć nowy plik MP3 do `sciezkadzwiekowa/`.
-4. **Zaktualizuj [`config.yaml`](config.yaml):**
-   - Wpisz dokładną nazwę nowego pliku: `music_file: "nazwa_nowego_utworu.mp3"`.
-   - Wyczyść listę `forced_clips` (usuń ujęcia ze starego projektu):
-     ```yaml
-     forced_clips: []
-     ```
+3. **Podmień muzykę:** Wrzuć nowy plik MP3 do `sciezkadzwiekowa/` (domyślnie `sciezka_dzwiekowa.mp3`).
+4. **Zaktualizuj konfigurację:**
+   - W [`config.yaml`](config.yaml) upewnij się, że `music_file` odpowiada Twojemu plikowi MP3 (domyślnie: `"sciezka_dzwiekowa.mp3"`).
+   - W dedykowanym pliku [`forced_clips.yaml`](forced_clips.yaml) podaj ujęcia, które koniecznie mają się znaleźć w montażu (lub zostaw `forced_clips: []`).
 5. **Uruchom montaż nowego filmu:**
    Dwukliknij `ZROB_PREVIEW.bat` lub uruchom `run.bat all`.
 
@@ -437,10 +434,11 @@ AI_MONTAGE/
 
 ---
 
-## ⭐ Gwarancja konkretnych ujęć - forced_clips
+## ⭐ Gwarancja konkretnych ujęć - forced_clips.yaml
 
 Możesz wskazać klipy, które **ZAWSZE** mają się znaleźć w finalnym montażu.
-Program wybierze z nich najlepszy fragment (ostrość, osoby, ruch) i przytnie do odpowiedniej długości.
+Wszystkie wymuszone ujęcia definiuje się w dedykowanym pliku [`forced_clips.yaml`](forced_clips.yaml).
+Program wybierze z nich najlepszy fragment (ostrość, osoby, ruch) i przytnie do odpowiedniej długości dopasowanej do rytmu muzyki.
 
 ### Jak dodać wymuszone ujęcie
 
@@ -449,7 +447,7 @@ Program wybierze z nich najlepszy fragment (ostrość, osoby, ruch) i przytnie d
 29_125240_piata_mowczyni_na_scenie_b_480p15.mp4
 ```
 
-**Krok 2** - Wpisz jego nazwę do [`config.yaml`](config.yaml) **bez `_480p15` i bez `.mp4`**:
+**Krok 2** - Wpisz jego nazwę do [`forced_clips.yaml`](forced_clips.yaml) **bez `_480p15` i bez `.mp4`**:
 
 ```yaml
 forced_clips:
@@ -469,7 +467,7 @@ forced_clips:
 >   BŁĄD KRYTYCZNY - wymuszone ujęcia nie zostały znalezione:
 > ═══════════════════════════════════════════════════════
 >   ✗  'nieistniejacy_plik'
->   Sprawdź nazwy w config.yaml → forced_clips
+>   Sprawdź nazwy w forced_clips.yaml → forced_clips
 >   Wpisz dokładną nazwę pliku (bez rozszerzenia i bez _480p15)
 >   Dostępne proxy znajdziesz w katalogu kopie_robocze_480p/
 > ═══════════════════════════════════════════════════════

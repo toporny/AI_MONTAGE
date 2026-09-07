@@ -26,6 +26,57 @@ from utils.hardware import HardwareDetector
 from utils.logger import console, logger
 
 
+def validate_project_readiness(config, cmd: str, args: argparse.Namespace) -> bool:
+    """
+    Sprawdza, czy w projekcie znajdują się wymagane pliki wideo i muzyczne.
+    W przypadku braku materiałów wyświetla czytelną instrukcję startową dla użytkownika.
+    """
+    if cmd in ["hardware", "clean"]:
+        return True
+
+    video_exts = {".mp4", ".mov", ".mkv", ".avi", ".m4v"}
+    proxy_videos = [f for f in config.proxy_dir.iterdir() if f.is_file() and f.suffix.lower() in video_exts and not f.name.startswith(".")] if config.proxy_dir.exists() else []
+    orig_videos = [f for f in config.original_dir.iterdir() if f.is_file() and f.suffix.lower() in video_exts and not f.name.startswith(".")] if config.original_dir.exists() else []
+
+    # 1. Sprawdzenie obecności plików wideo
+    if not proxy_videos and not orig_videos and cmd in ["analyze", "create-storyboard", "preview", "render", "openshot", "all"]:
+        console.print("\n[bold yellow]================================================================================[/bold yellow]")
+        console.print("[bold yellow]           WITAJ W INTELIGENTNYM MONTAŻYŚCIE AI (AI MONTAGE)![/bold yellow]")
+        console.print("[bold yellow]================================================================================[/bold yellow]\n")
+        console.print("Projekt został pomyślnie zainstalowany, ale w katalogach roboczych nie ma jeszcze materiałów.\n")
+        console.print("[bold cyan]Aby rozpocząć montaż, wykonaj 3 proste kroki:[/bold cyan]\n")
+        console.print("  [bold green]1. Wgraj nagrania wideo[/bold green] (np. pliki 4K z aparatu lub telefonu) do folderu:")
+        console.print(f"     📁 [cyan]{config.original_dir.resolve()}[/cyan]\n")
+        console.print("  [bold green]2. Wgraj utwór muzyczny[/bold green] do folderu:")
+        console.print(f"     📁 [cyan]{config.music_dir.resolve()}[/cyan]")
+        console.print(f"     (domyślna nazwa pliku to: [bold white]{config.music_file}[/bold white] – możesz też zmienić nazwę w config.yaml)\n")
+        console.print("  [bold green]3. (Opcjonalnie) Wskaż ujęcia gwarantowane[/bold green] w dedykowanym pliku:")
+        console.print(f"     📄 [cyan]{config.forced_clips_file.resolve()}[/cyan]\n")
+        console.print("[bold cyan]Po wrzuceniu nagrań i muzyki uruchom:[/bold cyan]")
+        console.print("  👉 [bold green]ZROB_PREVIEW.bat[/bold green]   (lub w konsoli: [cyan]run.bat all[/cyan])\n")
+        console.print("[bold yellow]================================================================================[/bold yellow]\n")
+        return False
+
+    # Jeśli są nagrania w oryginałach, ale nie ma jeszcze proxy
+    if not proxy_videos and orig_videos and cmd in ["analyze", "create-storyboard", "preview", "render"]:
+        console.print(f"\n[bold yellow]Wykryto {len(orig_videos)} nagrań w folderze 'materialy_oryginalne\', ale brak kopii roboczych w 'kopie_robocze_480p\'![/bold yellow]\n")
+        console.print("Uruchom najpierw synchronizację, aby automatycznie utworzyć lekkie proxy do analizy:")
+        console.print("  👉 [bold green]run.bat sync-proxies[/bold green]   (lub dwukliknij: [bold green]ZROB_PREVIEW.bat[/bold green])\n")
+        return False
+
+    # 2. Sprawdzenie obecności pliku muzycznego
+    if cmd in ["analyze-music", "create-storyboard", "preview", "render", "all"]:
+        music_path = Path(args.music) if args.music else config.get_music_file_path()
+        if not music_path or not music_path.exists():
+            console.print(f"\n[bold red]BŁĄD KRYTYCZNY: Nie znaleziono pliku muzycznego '{config.music_file}'![/bold red]\n")
+            console.print("Upewnij się, że plik o dokładnie takiej nazwie znajduje się w folderze:")
+            console.print(f"  📁 [cyan]{config.music_dir.resolve()}[/cyan]")
+            console.print("lub wskaż inną nazwę utworu w pliku [bold cyan]config.yaml[/bold cyan] ([dim]music_file: \"twoj_plik.mp3\"[/dim]).\n")
+            return False
+
+    return True
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="AI Automatic Music Montage System (Universal Hardware / NVENC / AMF / QSV / CPU)",
@@ -104,6 +155,9 @@ def main():
     console.print("[bold blue]================================================================================[/bold blue]")
     console.print("[bold cyan]       INTELIGENTNY SYSTEM AUTOMATYCZNEGO MONTAŻU AI (AI MONTAGE)[/bold cyan]")
     console.print("[bold blue]================================================================================[/bold blue]\n")
+
+    if not validate_project_readiness(config, cmd, args):
+        sys.exit(1)
 
     if cmd in ["preview", "render", "all"]:
         HardwareDetector.print_startup_banner(console)

@@ -1,0 +1,37 @@
+﻿# ==============================================================================
+# LISTA WYMUSZONYCH UJĘĆ (forced_clips)
+# ==============================================================================
+# Ujęcia z tej listy ZAWSZE znajdą się w finalnym montażu.
+# Program wybierze najlepszy fragment z danego klipu (ostrość, osoby, ruch)
+# i przytnie go do odpowiedniej długości dopasowanej do rytmu muzyki.
+#
+# WAŻNE — DOPASOWANIE ŚCISŁE (exact match):
+#   Pole "file" musi być DOKŁADNĄ nazwą pliku (bez rozszerzenia i bez _480p15).
+#   Jeśli plik nie istnieje w kopie_robocze_480p/ → program przerwie działanie z błędem.
+#
+#   Skąd wziąć nazwę pliku?
+#   → Otwórz katalog kopie_robocze_480p/
+#   → Znajdź interesujący cię plik, np.: 29_125240_piata_mowczyni_na_scenie_b_480p15.mp4
+#   → Wpisz jego nazwę BEZ _480p15 i BEZ .mp4: "29_125240_piata_mowczyni_na_scenie_b"
+#
+# Każda pozycja na liście:
+#   file: (wymagane) dokładna nazwa pliku (patrz wyżej)
+#   clip_time_start: (opcjonalne) punkt startowy wewnątrz nagrania (od kiedy wycinać)
+#                    Formaty: "0:03" = od 3. sekundy | "15" = od 15. sekundy nagrania
+#   clip_time_end:   (opcjonalne) punkt końcowy wewnątrz nagrania (kiedy ma się skończyć)
+#                    Formaty: "0:10" = ujęcie skończy się w 10. sekundzie nagrania
+#
+#   WAŻNE: clip_time_start i clip_time_end NIE MOGĄ występować naraz dla tego samego ujęcia!
+#
+# Przykłady:
+# forced_clips:
+#   - file: "29_125240_piata_mowczyni_na_scenie_b"
+#     clip_time_start: "0:03"
+#
+#   - file: "29_130535_ludzie_zbieraja_sie_na_sciance_c"
+#
+#   - file: "28_193407_kolacja_wieczorna"
+#     clip_time_end: "0:12"
+# ==============================================================================
+
+forced_clips: []
