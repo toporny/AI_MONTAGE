@@ -111,7 +111,6 @@ def compress_to_proxy(original: Path, output: Path, dry_run: bool, encoder_args:
 
     cmd = [
         "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-        "-hwaccel", "auto",
         "-i", str(original),
         "-vf", vf_filter,
         "-r", "15",
